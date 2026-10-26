@@ -87,4 +87,10 @@ describe('shared variant helpers', () => {
     expect(helpers.getItemQuantity(item)).toBe('3');
     expect(helpers.formatItemVariants({ variants: [{ color: '', size: '', isPackaged: true }], notes: '旧文字' })).toBe('旧文字');
   });
+
+  it('does not restore a cleared recognized specification from historical notes', () => {
+    const item = { notes: '白色 S', variants: [{ color: '', size: '', isPackaged: false }] };
+    expect(helpers.formatItemVariants(item)).toBe('');
+    expect(item.notes).toBe('白色 S');
+  });
 });

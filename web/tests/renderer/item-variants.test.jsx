@@ -69,6 +69,14 @@ describe('structured item variants in the renderer', () => {
     expect(applyItemGalleryFilters(p.items, p.categories, p.locations, { packaging: 'unpackaged' }, 'M').map(item => item.id)).toEqual(['loose']);
   });
 
+  it('does not search replaced recognized specifications but keeps unclear original text searchable', () => {
+    const p = fixture();
+    p.items[0].notes = '蓝白 44码';
+    expect(applyItemGalleryFilters(p.items, p.categories, p.locations, {}, '蓝白')).toEqual([]);
+    p.items[0].notes = '原有规格说明';
+    expect(applyItemGalleryFilters(p.items, p.categories, p.locations, {}, '原有规格说明')).toHaveLength(1);
+  });
+
   it('shows the derived count and a package icon only while at least one row is packaged', () => {
     const item = fixture().items[0];
     const card = buildItemCardView(item);

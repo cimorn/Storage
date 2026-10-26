@@ -1,5 +1,5 @@
 import { normalizeItemDetail } from './item-detail-text';
-import { formatItemVariants, getItemQuantity, hasItemPackaging } from '../../../../shared/item-variants.mjs';
+import { formatItemVariants, getItemQuantity, hasItemPackaging, parseLegacyVariant } from '../../../../shared/item-variants.mjs';
 import { collectDescendantIds, getChildEntries, getItemLocationIds, getNodeLineage, normalizeTagCodes, toText } from '../../lib/project-data';
 
 export function formatCompactPath(path) {
@@ -159,7 +159,8 @@ export function applyItemGalleryFilters(items = [], categories = [], locations =
       return true;
     }
 
-    return [item.name, item.notes, ...(item.variants || []).flatMap(row => [row.color, row.size]), item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
+    const originalNotes = Array.isArray(item.variants) && parseLegacyVariant(item.notes) ? '' : item.notes;
+    return [item.name, originalNotes, ...(item.variants || []).flatMap(row => [row.color, row.size]), item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
       .map(toText)
       .filter(Boolean)
       .join(' ')

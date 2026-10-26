@@ -66,5 +66,7 @@ export function formatItemVariants(item = {}) {
   const details = getItemVariants(item)
     .map(row => [row.color, row.size].filter(Boolean).join('·'))
     .filter(Boolean);
-  return details.length ? [...new Set(details)].join(' / ') : text(item.notes);
+  if (details.length) return [...new Set(details)].join(' / ');
+  if (Array.isArray(item.variants) && parseLegacyVariant(item.notes)) return '';
+  return text(item.notes);
 }
