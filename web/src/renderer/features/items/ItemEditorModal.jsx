@@ -3,6 +3,7 @@ import { getItemVariants, MAX_ITEM_VARIANTS, withVariantSummary } from '../../..
 import { getItemImageIds, MAX_ITEM_IMAGES, withImageSummary } from '../../../../shared/item-images.mjs';
 
 import {
+  buildNodePath,
   completeSmartTagInput,
   getChildEntries,
   getItemLocationIds,
@@ -424,9 +425,13 @@ export default function ItemEditorModal({
           </button>
         </div>
 
-        <div className="item-editor-modal__tabs" role="tablist" aria-label="物品页面" ref={tabsRef} onKeyDown={handleTabKeyDown}>
-          <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑页</button>
-          <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息页</button>
+        <div className="item-editor-modal__toolbar">
+          <div className="item-editor-modal__tabs" role="tablist" aria-label="物品页面" ref={tabsRef} onKeyDown={handleTabKeyDown}>
+            <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑页</button>
+            <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息页</button>
+          </div>
+          <button className="secondary-button item-editor-modal__choose-images" type="button" onClick={() => fileInputRef.current?.click()} disabled={saving}>选择图片</button>
+          <input hidden ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
         </div>
 
         <div className="item-editor-modal__body">
@@ -439,21 +444,15 @@ export default function ItemEditorModal({
           <section className="item-editor-modal__media">
             <ItemImageEditor imageIds={draft.imagePaths} pendingImages={pendingImages} saving={saving}
               onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} />
-            <div className="item-editor-modal__media-actions">
-              <div className="item-editor-modal__source-actions web-item-editor-options">
-                <button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()} disabled={saving}>
-                  选择图片
-                </button>
-                {canManagePrivacy ? <label className="web-item-option-control">
-                  <input type="checkbox" checked={draft.isPrivate || inheritedPrivate} disabled={saving || inheritedPrivate}
-                    aria-describedby={inheritedPrivate ? 'item-privacy-inheritance' : undefined}
-                    onChange={event => updateDraft({ isPrivate: event.target.checked })} />
-                  <span>隐私区</span>
-                </label> : null}
-              </div>
-              {canManagePrivacy && inheritedPrivate ? <p id="item-privacy-inheritance" className="privacy-inheritance-hint">所选分类或位置属于隐私区</p> : null}
-              <input hidden ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
-            </div>
+            {canManagePrivacy ? <div className="item-editor-modal__media-actions">
+              <label className="web-item-option-control">
+                <input type="checkbox" checked={draft.isPrivate || inheritedPrivate} disabled={saving || inheritedPrivate}
+                  aria-describedby={inheritedPrivate ? 'item-privacy-inheritance' : undefined}
+                  onChange={event => updateDraft({ isPrivate: event.target.checked })} />
+                <span>隐私区</span>
+              </label>
+              {inheritedPrivate ? <p id="item-privacy-inheritance" className="privacy-inheritance-hint">所选分类或位置属于隐私区</p> : null}
+            </div> : null}
           </section>
 
           <fieldset className="item-editor-modal__form" disabled={saving}>
@@ -464,10 +463,10 @@ export default function ItemEditorModal({
               </label>
             </div>
 
-            <ItemVariantFields variants={draft.variants} notes={draft.notes} legacyQuantity={draft.quantity} maxVariants={MAX_ITEM_VARIANTS}
+            <ItemVariantFields variants={draft.variants} maxVariants={MAX_ITEM_VARIANTS}
               onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} />
 
-            <div className="form-row form-row--2">
+            <div className="form-row form-row--2 item-editor-modal__paired-row">
               <label className="field">
                 <span>品牌</span>
                 <input value={draft.brand} onChange={(event) => updateDraft({ brand: event.target.value })} />
@@ -478,7 +477,7 @@ export default function ItemEditorModal({
               </label>
             </div>
 
-            <div className="form-row form-row--2">
+            <div className="form-row form-row--2 item-editor-modal__paired-row">
               <label className="field">
                 <span>主分类</span>
                 <select value={categorySelection.mainCategoryId} onChange={(event) => handleMainCategoryChange(event.target.value)}>
@@ -538,13 +537,15 @@ export default function ItemEditorModal({
                       </select>
                     </label>
                   </div>
-                  <button type="button" className="ghost-button item-location-editor__remove" aria-label={`移除位置 ${index + 1}`}
-                    disabled={draft.locationIds.length === 1 && !locationId} onClick={() => removeLocation(index)}>移除</button>
+                  <div className="item-location-editor__controls" role="group" aria-label={`位置 ${index + 1} 操作`}>
+                    {index === draft.locationIds.length - 1 ? <button type="button" className="item-location-editor__add" aria-label="添加位置" title="添加存放位置"
+                      disabled={draft.locationIds.length >= 32 || draft.locationIds.includes('')}
+                      onClick={() => updateDraft({ locationIds: [...draft.locationIds, ''] })}>＋</button> : null}
+                    <button type="button" className="item-location-editor__remove" aria-label={`移除位置 ${index + 1}`} title="移除存放位置"
+                      disabled={draft.locationIds.length === 1 && !locationId} onClick={() => removeLocation(index)}>×</button>
+                  </div>
                 </div>;
               })}
-              <button type="button" className="secondary-button item-location-editor__add"
-                disabled={draft.locationIds.length >= 32 || draft.locationIds.includes('')}
-                onClick={() => updateDraft({ locationIds: [...draft.locationIds, ''] })}>添加位置</button>
             </section>
 
             <section className="tag-editor-panel tag-editor-panel--compact" aria-label="物品标签">
@@ -620,7 +621,7 @@ export default function ItemEditorModal({
           </fieldset>
           </div>
           <section role="tabpanel" id="item-editor-information-panel" aria-labelledby="item-editor-information-tab" hidden={activeTab !== 'information'}>
-            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} legacyQuantity={draft.quantity} /> : null}
+            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
           </section>
         </div>
 

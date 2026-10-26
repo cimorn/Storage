@@ -19,6 +19,18 @@ const items = [
 ];
 
 describe('applyItemGalleryFilters', () => {
+  it('searches structured colors and sizes while discarding old free-form specification text', () => {
+    const source = [
+      { id: 'legacy', name: '旧物品', notes: '独有旧规格文字', quantity: '2' },
+      { id: 'recognized', name: '可转换物品', notes: '白色 S', quantity: '2' },
+      { id: 'structured', name: '新物品', notes: '独有旧规格文字', variants: [{ color: '黑色', size: 'M', isPackaged: false }] }
+    ];
+    expect(applyItemGalleryFilters(source, [], [], {}, '独有旧规格文字')).toEqual([]);
+    expect(applyItemGalleryFilters(source, [], [], {}, '白色').map(item => item.id)).toEqual(['recognized']);
+    expect(applyItemGalleryFilters(source, [], [], {}, '黑色').map(item => item.id)).toEqual(['structured']);
+    expect(buildItemCardView(source[0]).note).toBe('');
+    expect(buildItemCardView(source[1]).note).toBe('白色·S');
+  });
   it('intersects packaging with category, location, tag and search; legacy absence is unpackaged', () => {
     const source = [
       { id: 'yes', name: '相机', categoryId: 'cat_clothes', locationId: 'loc_box', tags: ['A'], isPackaged: true },

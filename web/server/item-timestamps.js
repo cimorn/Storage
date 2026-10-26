@@ -1,8 +1,19 @@
 'use strict';
 
 const {getItemImageIds}=require('../shared/item-images.mjs');
+const {getItemVariants}=require('../shared/item-variants.mjs');
 
-const TEXT_FIELDS = ['barcode', 'code', 'name', 'brand', 'quantity', 'specification', 'notes', 'categoryId', 'imagePath'];
+const TEXT_FIELDS = ['barcode', 'code', 'name', 'brand', 'specification', 'categoryId', 'imagePath'];
+
+function variantContent(item) {
+  const rows = getItemVariants(item);
+  // Safe legacy counts and structured rows describe the same item units.
+  // Their obsolete notes and redundant summary fields are format cleanup.
+  // Preserve raw values when the old count cannot be converted safely.
+  return rows.length
+    ? [String(rows.length), rows.some(row => row.isPackaged), rows.map(row => [row.color, row.size, row.isPackaged])]
+    : [String(item.quantity ?? ''), item.isPackaged === true, null, String(item.notes ?? '')];
+}
 
 function itemContent(item) {
   // Derived paths and catalog ordering are not item edits. Location order is
@@ -12,8 +23,7 @@ function itemContent(item) {
     ...TEXT_FIELDS.map(field => String(item[field] ?? '')),
     [...new Set(locations)],
     getItemImageIds(item),
-    item.isPackaged === true,
-    Array.isArray(item.variants) ? item.variants.map(row => [String(row.color ?? ''), String(row.size ?? ''), row.isPackaged === true]) : null,
+    variantContent(item),
     item.isPrivate === true,
     [...new Set(item.tags || [])].sort()
   ]);

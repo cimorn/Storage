@@ -55,7 +55,7 @@ describe('copy a saved item into a new draft', () => {
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
     const draft = onCreateItem.mock.calls[0][0];
-    expect(draft).toMatchObject({ name: '另一副耳机', notes: source.notes, brand: source.brand, specification: source.specification,
+    expect(draft).toMatchObject({ name: '另一副耳机', notes: '', brand: source.brand, specification: source.specification,
       variants: source.variants, barcode: source.barcode, categoryId: source.categoryId, locationIds: ['home', 'office'],
       tags: ['SM-001'], isPackaged: true, imagePath: 'independent-image' });
     for (const key of ['id', 'createdAt', 'updatedAt', 'feishuRecordId']) expect(draft).not.toHaveProperty(key);

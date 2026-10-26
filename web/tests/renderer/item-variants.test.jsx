@@ -21,11 +21,11 @@ function fixture() {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe('structured item variants in the renderer', () => {
-  it('retains independent rows on load and derives count and packaging without discarding legacy text or style', () => {
+  it('retains independent rows and style while discarding legacy specification text', () => {
     const source = fixture();
     const item = sanitizeProject(source).items[0];
     expect(item).toMatchObject({ variants: rows(), quantity: '2', isPackaged: true,
-      notes: '原有规格说明', specification: '印花 镂空' });
+      notes: '', specification: '印花 镂空' });
     item.variants[0].color = '蓝色';
     expect(source.items[0].variants[0].color).toBe('白色');
   });
@@ -69,12 +69,12 @@ describe('structured item variants in the renderer', () => {
     expect(applyItemGalleryFilters(p.items, p.categories, p.locations, { packaging: 'unpackaged' }, 'M').map(item => item.id)).toEqual(['loose']);
   });
 
-  it('does not search replaced recognized specifications but keeps unclear original text searchable', () => {
+  it('does not search any discarded original specification text', () => {
     const p = fixture();
     p.items[0].notes = '蓝白 44码';
     expect(applyItemGalleryFilters(p.items, p.categories, p.locations, {}, '蓝白')).toEqual([]);
     p.items[0].notes = '原有规格说明';
-    expect(applyItemGalleryFilters(p.items, p.categories, p.locations, {}, '原有规格说明')).toHaveLength(1);
+    expect(applyItemGalleryFilters(p.items, p.categories, p.locations, {}, '原有规格说明')).toEqual([]);
   });
 
   it('shows the derived count and a package icon only while at least one row is packaged', () => {

@@ -30,7 +30,7 @@ describe('structured item variants on the server', () => {
   it('keeps ordered rows, trims detail text and derives count and packaging from rows', () => {
     const input = fixture(); input.items[0].variants[0].color = ' 白色 ';
     const result = validateProject(input).items[0];
-    expect(result).toMatchObject({ variants: rows(), quantity: '2', isPackaged: true, notes: '原始规格文字', specification: '原有款式' });
+    expect(result).toMatchObject({ variants: rows(), quantity: '2', isPackaged: true, notes: '', specification: '原有款式' });
     expect(input.items[0].variants[0].color).toBe(' 白色 ');
   });
 

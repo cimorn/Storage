@@ -180,6 +180,23 @@ describe('NAS editor deferred image upload', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'staged-image', variants: [{ color: '蓝色', size: '', isPackaged: false }] })));
   });
 
+  it('offers the image picker beside both tabs and keeps information-page selections local until Save', async () => {
+    const user = userEvent.setup();
+    const { api, onSave } = setup();
+    const picker = screen.getByRole('button', { name: '选择图片' });
+    const tabs = screen.getByRole('tablist', { name: '物品页面' });
+    expect(picker.closest('.item-editor-modal__toolbar')).toContainElement(tabs);
+    expect(tabs).not.toContainElement(picker);
+    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    expect(picker).toBeVisible();
+    await selectPhoto(user);
+    expect(api.uploadImage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePaths: ['staged-image'] })));
+  });
+
   it('shows a save failure on the information page while preserving the selected photo and rows', async () => {
     const user = userEvent.setup();
     const { onSave } = setup({ api: { uploadImage: vi.fn().mockRejectedValue(new Error('上传断开')) } });
