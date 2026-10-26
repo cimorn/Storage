@@ -100,6 +100,39 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.getByText('已保存图片')).toBeInTheDocument();
   });
 
+  it('keeps a selected File and information tab draft through an ordinary project refresh', async () => {
+    const user = userEvent.setup();
+    const { api, onSave, rerenderEditor } = setup();
+    await user.type(screen.getByLabelText('颜色1'), '蓝色');
+    await selectPhoto(user);
+    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    rerenderEditor({ item: { ...item }, categories: categories.map(category => ({ ...category })), locations: [] });
+    expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
+    expect(api.uploadImage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'staged-image', variants: [{ color: '蓝色', size: '', isPackaged: false }] })));
+  });
+
+  it('shows a save failure on the information page while preserving the selected photo and rows', async () => {
+    const user = userEvent.setup();
+    const { onSave } = setup({ api: { uploadImage: vi.fn().mockRejectedValue(new Error('上传断开')) } });
+    await user.type(screen.getByLabelText('颜色1'), '蓝色');
+    await selectPhoto(user);
+    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('上传断开');
+    expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
+  });
+
   it('cancels a selected photo without reading or uploading it', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -159,14 +192,14 @@ describe('NAS editor deferred image upload', () => {
     const uploadImage = vi.fn().mockRejectedValueOnce(new Error('上传断开')).mockResolvedValueOnce({ imageId: 'retry-image' });
     const { onSave } = setup({ api: { uploadImage } });
     await selectPhoto(user);
-    await user.type(screen.getByLabelText('规格'), '保留这段草稿');
+    await user.type(screen.getByLabelText('颜色1'), '保留这段草稿');
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(await screen.findByText('上传断开')).toBeInTheDocument();
-    expect(screen.getByLabelText('规格')).toHaveValue('保留这段草稿');
+    expect(screen.getByLabelText('颜色1')).toHaveValue('保留这段草稿');
     expect(screen.getByText('相册照片.png')).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存' }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'retry-image', notes: '保留这段草稿' })));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'retry-image', variants: [{ color: '保留这段草稿', size: '', isPackaged: false }] })));
     expect(uploadImage).toHaveBeenCalledTimes(2);
   });
 
@@ -222,15 +255,15 @@ describe('NAS editor deferred image upload', () => {
   it('preserves a dirty draft and selected File when the same record and catalogs refresh', async () => {
     const user = userEvent.setup();
     const { api, onSave, rerenderEditor } = setup();
-    await user.type(screen.getByLabelText('规格'), '不能被项目刷新覆盖');
+    await user.type(screen.getByLabelText('颜色1'), '不能被项目刷新覆盖');
     await selectPhoto(user);
     rerenderEditor({ item: { ...item, name: '服务器更新的名称' }, categories: categories.map((category) => ({ ...category })), locations: [...locations] });
 
     expect(screen.getByLabelText('名称')).toHaveValue('标签机');
-    expect(screen.getByLabelText('规格')).toHaveValue('不能被项目刷新覆盖');
+    expect(screen.getByLabelText('颜色1')).toHaveValue('不能被项目刷新覆盖');
     expect(screen.getByText('相册照片.png')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存' }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '标签机', notes: '不能被项目刷新覆盖', imagePath: 'staged-image' })));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '标签机', variants: [{ color: '不能被项目刷新覆盖', size: '', isPackaged: false }], imagePath: 'staged-image' })));
     expect(api.uploadImage).toHaveBeenCalledTimes(1);
   });
 
@@ -238,19 +271,19 @@ describe('NAS editor deferred image upload', () => {
     const user = userEvent.setup();
     const upload = deferred();
     const { api, onSave, rerenderEditor } = setup({ api: { uploadImage: vi.fn(() => upload.promise) } });
-    await user.type(screen.getByLabelText('规格'), '上传时保留');
+    await user.type(screen.getByLabelText('颜色1'), '上传时保留');
     await selectPhoto(user);
     await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(api.uploadImage).toHaveBeenCalledTimes(1));
     rerenderEditor({ item: { ...item }, categories: categories.map((category) => ({ ...category })), locations: [...locations] });
 
-    expect(screen.getByLabelText('规格')).toHaveValue('上传时保留');
+    expect(screen.getByLabelText('颜色1')).toHaveValue('上传时保留');
     expect(screen.getByText('相册照片.png')).toBeInTheDocument();
-    expect(screen.getByLabelText('规格')).toBeDisabled();
+    expect(screen.getByLabelText('颜色1')).toBeDisabled();
     expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
     await act(async () => upload.resolve({ imageId: 'refreshed-upload' }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '上传时保留', imagePath: 'refreshed-upload' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '上传时保留', size: '', isPackaged: false }], imagePath: 'refreshed-upload' }));
   });
 
   it.each(['close', 'unmount'])('does not save an obsolete upload after editor %s while its image provider remains mounted', async (endSession) => {
@@ -271,14 +304,14 @@ describe('NAS editor deferred image upload', () => {
     const user = userEvent.setup();
     const upload = deferred();
     const { api, onSave, rerenderEditor } = setup({ api: { uploadImage: vi.fn(() => upload.promise) } });
-    await user.type(screen.getByLabelText('规格'), '上一个物品的草稿');
+    await user.type(screen.getByLabelText('颜色1'), '上一个物品的草稿');
     await selectPhoto(user);
     await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(api.uploadImage).toHaveBeenCalledTimes(1));
     rerenderEditor({ item: { ...item, id: 'item-2', name: '第二个物品' } });
     expect(screen.getByLabelText('名称')).toHaveValue('第二个物品');
-    expect(screen.getByLabelText('规格')).toHaveValue('');
-    expect(screen.getByLabelText('规格')).toBeEnabled();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('');
+    expect(screen.getByLabelText('颜色1')).toBeEnabled();
     expect(screen.queryByText('相册照片.png')).not.toBeInTheDocument();
     await act(async () => upload.resolve({ imageId: 'old-record-upload' }));
     expect(onSave).not.toHaveBeenCalled();

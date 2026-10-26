@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useImagePreviewState } from '../web/ImageAccessContext';
+import { hasItemPackaging } from '../../../../shared/item-variants.mjs';
 
 export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected = false, onClick }) {
   const imageTargetRef = useRef(null);
@@ -43,7 +44,7 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
               ))}
             </span>
           ) : null}
-          {item.isPackaged === true ? (
+          {hasItemPackaging(item) ? (
             <svg className="item-gallery-card__packaging" role="img" aria-label="有包装" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" focusable="false">
               <title>有包装</title>
               <path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7.5 5l9 4" />

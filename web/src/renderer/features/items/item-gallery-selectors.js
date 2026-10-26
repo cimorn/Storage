@@ -1,4 +1,5 @@
 import { normalizeItemDetail } from './item-detail-text';
+import { formatItemVariants, getItemQuantity, hasItemPackaging } from '../../../../shared/item-variants.mjs';
 import { collectDescendantIds, getChildEntries, getItemLocationIds, getNodeLineage, normalizeTagCodes, toText } from '../../lib/project-data';
 
 export function formatCompactPath(path) {
@@ -10,13 +11,14 @@ export function formatCompactPath(path) {
 }
 
 export function buildItemCardView(item) {
-  const note = normalizeItemDetail(item.notes);
-  const quantity = toText(item.quantity);
+  const note = Array.isArray(item.variants) ? formatItemVariants(item) : normalizeItemDetail(item.notes);
+  const quantity = toText(getItemQuantity(item));
   const metaLine = [item.brand, normalizeItemDetail(item.specification), quantity === '1' ? '' : quantity].map(toText).filter(Boolean).join(' · ');
   const locationLine = [...new Set((item.locationPaths || [item.locationPath]).map(formatCompactPath).filter(Boolean))].join('；') || '未设置位置';
 
   return {
     ...item,
+    isPackaged: hasItemPackaging(item),
     title: toText(item.name) || '未命名物品',
     note,
     metaLine,
@@ -126,8 +128,8 @@ export function applyItemGalleryFilters(items = [], categories = [], locations =
   const needle = toText(search).toLowerCase();
 
   return items.filter((item) => {
-    if (filters.packaging === 'packaged' && item.isPackaged !== true) return false;
-    if (filters.packaging === 'unpackaged' && item.isPackaged === true) return false;
+    if (filters.packaging === 'packaged' && !hasItemPackaging(item)) return false;
+    if (filters.packaging === 'unpackaged' && hasItemPackaging(item)) return false;
     if (filters.mainCategoryId) {
       if (getNodeLineage(categories, item.categoryId)[0]?.id !== filters.mainCategoryId) {
         return false;
@@ -157,7 +159,7 @@ export function applyItemGalleryFilters(items = [], categories = [], locations =
       return true;
     }
 
-    return [item.name, item.notes, item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
+    return [item.name, item.notes, ...(item.variants || []).flatMap(row => [row.color, row.size]), item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
       .map(toText)
       .filter(Boolean)
       .join(' ')

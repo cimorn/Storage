@@ -8,6 +8,8 @@
 !web/vite.config.js
 !web/src/
 !web/src/**
+!web/shared/
+!web/shared/**
 !web/public/
 !web/public/favicon.ico
 !web/public/icon.png

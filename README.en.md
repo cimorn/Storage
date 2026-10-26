@@ -29,6 +29,10 @@ For phone access, set `STORAGE_BIND_ADDRESS=0.0.0.0` and `STORAGE_PUBLIC_ORIGIN`
 
 Enter the access password to manage items and photos. Combine category, location, tag, and packaging filters. Drag categories and locations to reorder them.
 
+Add color, size, and packaging rows to each item. Each row represents one physical item; the quantity is calculated from the row count. Leave color or size blank when it does not apply. Open an item to edit rows or view them in the Information tab. The card shows a packaging icon if any row is packaged. Bulk packaging changes apply to all rows of the selected items.
+
+Recognizable existing details populate color and size; other original text remains available for checking. Existing quantities are retained as rows. Items are sorted by latest update by default.
+
 Click the app name at the top-left to unlock the private area. Locking or refreshing hides it again.
 
 ## Development

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { applyItemTimestamps } from '../lib/item-timestamps';
+import { getItemVariants, withVariantSummary } from '../../../shared/item-variants.mjs';
 
 import {
   MAX_LEVELS,
@@ -76,11 +77,14 @@ function clearItemReferences(items, nodeIds, key) {
 
 function applyItemPatch(item, patch = {}, { replaceLocations = false } = {}) {
   const next = { ...item, ...patch, ...optionalBoolean(patch, 'isPackaged') };
+  if (Array.isArray(item.variants) && Object.hasOwn(patch, 'isPackaged') && !Object.hasOwn(patch, 'variants')) {
+    next.variants = item.variants.map(row => ({ ...row, isPackaged: patch.isPackaged }));
+  }
   if (!Object.hasOwn(patch, 'locationIds') && Object.hasOwn(patch, 'locationId') && Object.hasOwn(item, 'locationIds') &&
       (replaceLocations || (patch.locationId || null) !== (item.locationId || null))) {
     next.locationIds = patch.locationId ? [patch.locationId] : [];
   }
-  return next;
+  return withVariantSummary(next);
 }
 
 function appendCatalogNode(entries, node) {
@@ -194,6 +198,7 @@ function createProjectState(set, get) {
           locationId: draft?.locationId || null,
           ...(Object.hasOwn(draft || {}, 'locationIds') ? { locationIds: getItemLocationIds(draft) } : {}),
           ...optionalBoolean(draft || {}, 'isPackaged'),
+          ...(Object.hasOwn(draft || {}, 'variants') ? { variants: getItemVariants(draft) } : {}),
           locationPath: '',
           imagePath: toText(draft?.imagePath),
           quantity: toText(draft?.quantity),

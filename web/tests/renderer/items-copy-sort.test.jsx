@@ -18,6 +18,7 @@ const source = {
   id: 'saved-item', name: '耳机', notes: '备用', brand: '品牌', specification: '型号', quantity: '2',
   barcode: 'CODE', categoryId: 'ordinary', locationId: 'home', locationIds: ['home', 'office'],
   imagePath: 'original-image', tags: ['SM-001'], isPackaged: true, isPrivate: false,
+  variants: [{ color: '白色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: true }],
   createdAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-02-03T00:00:00.000Z', feishuRecordId: 'remote-record'
 };
 function setup(item = source) {
@@ -43,7 +44,9 @@ describe('copy a saved item into a new draft', () => {
     expect(screen.getByRole('heading', { name: '复制新增' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '删除物品' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('名称')).toHaveValue(source.name);
-    expect(screen.getByLabelText('包装')).toBeChecked();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('白色');
+    expect(screen.getByLabelText('包装1')).not.toBeChecked();
+    expect(screen.getByLabelText('包装2')).toBeChecked();
     expect(access.current.copy).not.toHaveBeenCalled();
     await user.clear(screen.getByLabelText('名称'));
     await user.type(screen.getByLabelText('名称'), '另一副耳机');
@@ -51,12 +54,15 @@ describe('copy a saved item into a new draft', () => {
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
     const draft = onCreateItem.mock.calls[0][0];
     expect(draft).toMatchObject({ name: '另一副耳机', notes: source.notes, brand: source.brand, specification: source.specification,
-      quantity: source.quantity, barcode: source.barcode, categoryId: source.categoryId, locationIds: ['home', 'office'],
+      variants: source.variants, barcode: source.barcode, categoryId: source.categoryId, locationIds: ['home', 'office'],
       tags: ['SM-001'], isPackaged: true, imagePath: 'independent-image' });
     for (const key of ['id', 'createdAt', 'updatedAt', 'feishuRecordId']) expect(draft).not.toHaveProperty(key);
     expect(access.current.copy).toHaveBeenCalledExactlyOnceWith('original-image');
     expect(onSaveItem).not.toHaveBeenCalled();
     expect(source.name).toBe('耳机');
+    expect(String(draft.quantity)).toBe('2');
+    expect(draft.variants).not.toBe(source.variants);
+    expect(draft.variants[0]).not.toBe(source.variants[0]);
   });
 
   it('canceling a copy performs no image or record writes', async () => {
@@ -82,19 +88,31 @@ describe('copy a saved item into a new draft', () => {
     render(<ItemEditorModal open mode="copy" item={source} categories={categories.filter(category => category.id !== 'private')}
       locations={locations} canManagePrivacy={false} />);
     expect(screen.queryByLabelText('隐私区')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('包装')).toBeChecked();
+    expect(screen.getByLabelText('包装2')).toBeChecked();
   });
 
   it('copies the saved version rather than silently carrying unsaved edits across', async () => {
     const { user, onSaveItem } = setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: source.name, exact: true }));
-    await user.clear(screen.getByLabelText('规格'));
-    await user.type(screen.getByLabelText('规格'), '尚未保存');
+    await user.clear(screen.getByLabelText('颜色1'));
+    await user.type(screen.getByLabelText('颜色1'), '尚未保存');
     await user.click(screen.getByRole('button', { name: '复制新增', exact: true }));
     expect(window.confirm).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('规格')).toHaveValue(source.notes);
+    expect(screen.getByLabelText('颜色1')).toHaveValue(source.variants[0].color);
     expect(onSaveItem).not.toHaveBeenCalled();
+  });
+
+  it('edits copied physical rows without changing the saved source rows', async () => {
+    const { user, onCreateItem } = setup();
+    await openCopy(user);
+    await user.clear(screen.getByLabelText('颜色1'));
+    await user.type(screen.getByLabelText('颜色1'), '蓝色');
+    await user.click(screen.getByLabelText('包装2'));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
+    expect(onCreateItem.mock.calls[0][0].variants).toEqual([{ color: '蓝色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: false }]);
+    expect(source.variants).toEqual([{ color: '白色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: true }]);
   });
 
   it('uses a replacement file without copying the original photo', async () => {

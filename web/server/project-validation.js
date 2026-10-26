@@ -1,5 +1,6 @@
 'use strict';
 const {StorageError}=require('./errors');
+const {normalizeVariantRows,withVariantSummary}=require('../shared/item-variants.mjs');
 const ITEM_FIELDS=['barcode','code','name','brand','quantity','specification','notes'];
 const META_FIELDS=['name','createdAt','updatedAt','appVersion'];
 const ID=/^[A-Za-z0-9_-]{1,128}$/;
@@ -7,6 +8,9 @@ function invalid(){throw new StorageError('INVALID_PROJECT');}
 function text(value,max=512){if(value==null)return '';if(typeof value!=='string'||value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value))invalid();return value.trim();}
 function id(value,nullable=false){if(nullable&&(value==null||value===''))return null;if(typeof value!=='string'||!ID.test(value)||['__proto__','constructor','prototype'].includes(value))invalid();return value;}
 function optionalBoolean(value,field){if(!Object.hasOwn(value,field))return {};if(typeof value[field]!=='boolean')invalid();return {[field]:value[field]};}
+function validateItemVariants(value){
+  try{return normalizeVariantRows(value);}catch{invalid();}
+}
 function getItemLocationIds(item){
   if(!Object.hasOwn(item,'locationIds'))return item.locationId?[item.locationId]:[];
   if(!Array.isArray(item.locationIds)||item.locationIds.length>32)invalid();
@@ -52,6 +56,7 @@ function validateProject(input,{allowImagePaths=false}={}){
       const clean=text(value[field],field==='notes'?16000:512);
       item[field]=(field==='notes'||field==='specification')?clean.split(/[\s·]+/u).filter(Boolean).join(' '):clean;
     }
+    if(Object.hasOwn(value,'variants')){item.variants=validateItemVariants(value.variants);Object.assign(item,withVariantSummary(item));}
     for(const field of ['createdAt','updatedAt'])if(value[field]!=null)item[field]=text(value[field],64);
     if(value.isPrivate!=null&&typeof value.isPrivate!=='boolean')invalid();item.isPrivate=value.isPrivate===true;
     if(!Array.isArray(value.tags||[])||(value.tags||[]).length>100)invalid();item.tags=[...new Set((value.tags||[]).map(x=>text(x,128)).filter(Boolean))];
