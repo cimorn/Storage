@@ -45,8 +45,6 @@ jobs:
           context: .
           load: true
           tags: storage-smoke:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - name: Check runtime and excluded private files
         run: node scripts/check-container.cjs storage-smoke:ci
       - name: Check portable Compose deployment
@@ -58,8 +56,6 @@ jobs:
           platforms: linux/arm64
           load: true
           tags: storage-smoke:arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - name: Check ARM64 runtime and WebP codec
         run: node scripts/check-container.cjs storage-smoke:arm64
       - name: Read release version
@@ -91,5 +87,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
