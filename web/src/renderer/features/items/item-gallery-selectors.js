@@ -1,5 +1,5 @@
 import { normalizeItemDetail } from './item-detail-text';
-import { formatItemVariants, getItemQuantity, hasItemPackaging, parseLegacyVariant } from '../../../../shared/item-variants.mjs';
+import { formatItemVariants, getItemQuantity, getItemVariants, hasItemPackaging } from '../../../../shared/item-variants.mjs';
 import { collectDescendantIds, getChildEntries, getItemLocationIds, getNodeLineage, normalizeTagCodes, toText } from '../../lib/project-data';
 
 export function formatCompactPath(path) {
@@ -11,7 +11,7 @@ export function formatCompactPath(path) {
 }
 
 export function buildItemCardView(item) {
-  const note = Array.isArray(item.variants) ? formatItemVariants(item) : normalizeItemDetail(item.notes);
+  const note = formatItemVariants(item);
   const quantity = toText(getItemQuantity(item));
   const metaLine = [item.brand, normalizeItemDetail(item.specification), quantity === '1' ? '' : quantity].map(toText).filter(Boolean).join(' · ');
   const locationLine = [...new Set((item.locationPaths || [item.locationPath]).map(formatCompactPath).filter(Boolean))].join('；') || '未设置位置';
@@ -159,8 +159,7 @@ export function applyItemGalleryFilters(items = [], categories = [], locations =
       return true;
     }
 
-    const originalNotes = Array.isArray(item.variants) && parseLegacyVariant(item.notes) ? '' : item.notes;
-    return [item.name, originalNotes, ...(item.variants || []).flatMap(row => [row.color, row.size]), item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
+    return [item.name, ...getItemVariants(item).flatMap(row => [row.color, row.size]), item.brand, item.specification, item.barcode, item.code, item.imagePath, item.categoryPath, item.locationPath, ...(item.locationPaths || []), ...normalizeTagCodes(item.tags)]
       .map(toText)
       .filter(Boolean)
       .join(' ')

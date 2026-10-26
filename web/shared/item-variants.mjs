@@ -23,8 +23,8 @@ export function normalizeVariantRows(rows) {
   });
 }
 
-// Only recognized whole strings are split. Arbitrary descriptions stay in
-// notes and can be displayed until the owner supplies structured details.
+// Only recognized whole strings are migrated into structured color/size rows.
+// Unrecognized legacy text is never used as a display or search fallback.
 export function parseLegacyVariant(value) {
   const input = detailText(value);
   if (!input) return null;
@@ -58,7 +58,7 @@ export function getItemQuantity(item = {}) {
 
 export function withVariantSummary(item = {}) {
   return Array.isArray(item.variants)
-    ? { ...item, quantity: getItemQuantity(item), isPackaged: hasItemPackaging(item) }
+    ? { ...item, notes: '', quantity: getItemQuantity(item), isPackaged: hasItemPackaging(item) }
     : item;
 }
 
@@ -66,8 +66,5 @@ export function formatItemVariants(item = {}) {
   const rows = getItemVariants(item);
   const colors = [...new Set(rows.map(row => row.color).filter(Boolean))].join('&');
   const sizes = [...new Set(rows.map(row => row.size).filter(Boolean))].join('&');
-  const details = [colors, sizes].filter(Boolean).join('·');
-  if (details) return details;
-  if (Array.isArray(item.variants) && parseLegacyVariant(item.notes)) return '';
-  return text(item.notes);
+  return [colors, sizes].filter(Boolean).join('·');
 }

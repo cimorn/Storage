@@ -1073,9 +1073,8 @@ button:not(:disabled):hover {
 }
 
 .item-gallery-card__title-row,
-.item-gallery-card__meta-row,
-.item-gallery-card__location-row,
-.item-gallery-card__storage-row {
+.item-gallery-card__variant-row,
+.item-gallery-card__meta-row {
   min-width: 0;
 }
 
@@ -1105,29 +1104,26 @@ button:not(:disabled):hover {
   text-overflow: ellipsis;
 }
 
-.item-gallery-card__note {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 48%;
+.item-gallery-card__variant-row {
+  min-height: 0.864rem;
   overflow: hidden;
-  color: #7c8791;
-  font-size: 0.58rem;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-}
-
-.item-gallery-card__meta-row {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--text-soft);
   font-size: 0.64rem;
   line-height: 1.35;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.item-gallery-card__location-row {
-  flex: 0 1 auto;
+.item-gallery-card__meta-row {
+  position: relative;
+  min-height: 14px;
+  /* Equal gutters keep text centered independently of the packaging icon. */
+  padding-inline: 18px;
+}
+
+.item-gallery-card__meta-text {
+  display: block;
   min-width: 0;
   color: var(--accent-warm);
   font-size: 0.63rem;
@@ -1147,57 +1143,6 @@ button:not(:disabled):hover {
   width: 14px;
   height: 14px;
   color: var(--text-soft);
-}
-
-.item-gallery-card__storage-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.item-gallery-card__storage-row:has(.item-gallery-card__packaging) {
-  min-height: 14px;
-  /* Reserve equal space on both sides so the icon never shifts the text center. */
-  padding-inline: 18px;
-}
-
-.item-gallery-card__storage-tags {
-  display: block;
-  flex: 0 1 auto;
-  max-width: 52%;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 0.55rem;
-  line-height: 1.2;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.item-gallery-card__storage-tags span {
-  display: inline-block;
-  vertical-align: middle;
-  max-width: 100%;
-  padding: 1px 5px;
-  overflow: hidden;
-  color: var(--accent-strong);
-  background: rgba(15, 118, 110, 0.09);
-  border: 1px solid rgba(15, 118, 110, 0.15);
-  border-radius: 999px;
-  font-size: 0.55rem;
-  font-weight: 900;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.item-gallery-card__storage-tags span + span {
-  margin-left: 3px;
 }
 
 .item-gallery-empty {

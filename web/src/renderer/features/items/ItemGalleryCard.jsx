@@ -84,18 +84,10 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
       <div className="item-gallery-card__content">
         <div className="item-gallery-card__title-row">
           <strong>{item.title}</strong>
-          {item.note ? <span className="item-gallery-card__note">{item.note}</span> : null}
         </div>
-        <div className="item-gallery-card__meta-row">{item.metaLine || '未填写品牌或款式'}</div>
-        <div className="item-gallery-card__storage-row" aria-label={`${item.title} 存放位置和标签`}>
-          <span className="item-gallery-card__location-row">{item.locationLine}</span>
-          {item.tags?.length ? (
-            <span className="item-gallery-card__storage-tags">
-              {item.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
-              ))}
-            </span>
-          ) : null}
+        <div className="item-gallery-card__variant-row">{item.note}</div>
+        <div className="item-gallery-card__meta-row">
+          <span className="item-gallery-card__meta-text">{item.metaLine || '未填写品牌或款式'}</span>
           {hasItemPackaging(item) ? (
             <svg className="item-gallery-card__packaging" role="img" aria-label="有包装" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" focusable="false">
               <title>有包装</title>

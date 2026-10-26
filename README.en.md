@@ -31,11 +31,11 @@ Enter the access password to manage items and photos. Combine category, location
 
 Add color, size, and packaging rows to each item. Each row represents one physical item; the quantity is calculated from the row count. Leave color or size blank when it does not apply. Open an item to edit rows or view them in the Information tab. The card shows a packaging icon if any row is packaged. Bulk packaging changes apply to all rows of the selected items.
 
-Card details group colors and sizes, for example `White&Red·S&M`; the Information tab retains each pairing. Store up to 20 photos per item. Select, preview, and remove photos in the editor; uploads begin only on Save. Scroll the thumbnail strip horizontally. Click a card to edit, or drag horizontally to switch photos. Left and right arrow keys also switch photos.
+Cards show the name, grouped color and size (for example `White&Red·S&M`), and brand/style on three lines. The Information tab shows categories and locations above the variant table. Store up to 20 photos per item. Choose photos beside the page tabs, preview or remove them in the editor, and upload only on Save. Scroll the thumbnail strip horizontally. Click a card to edit, or drag horizontally to switch photos. Left and right arrow keys also switch photos.
 
 Uploads become WebP images with a maximum long edge of 1920 pixels, without enlarging the source, and photo metadata is removed. Photos follow category moves, and backups include every photo of each item.
 
-Recognizable existing details populate color and size; other original text remains available for checking. Existing quantities are retained as rows. Items are sorted by latest update by default.
+Items are sorted by latest update by default.
 
 Click the app name at the top-left to unlock the private area. Locking or refreshing hides it again.
 

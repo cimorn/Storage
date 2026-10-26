@@ -62,6 +62,21 @@ describe('item timestamps in the project store', () => {
     expect(store.getState().currentProject.items[1].updatedAt).toBe(NOW);
   });
 
+  it.each([
+    { notes: '红色 M', color: '红色', size: 'M' },
+    { notes: '不再保留的原规格文字', color: '', size: '' }
+  ])('keeps recent ordering when saveItem migrates legacy details: $notes', details => {
+    const store = setup(); const project = fixture();
+    Object.assign(project.items[0], { quantity: '2件', notes: details.notes, isPackaged: true });
+    store.getState().setProject(project);
+    const source = store.getState().currentProject.items[0];
+    store.getState().saveItem('one', { ...source, notes: '', quantity: '2', variants: Array.from({ length: 2 }, () => ({ color: details.color, size: details.size, isPackaged: true })) });
+    expect(store.getState().currentProject.items[0]).toMatchObject({ createdAt: BEFORE, updatedAt: BEFORE, notes: '', quantity: '2' });
+    expect(store.getState().currentProject.items[1]).not.toHaveProperty('updatedAt');
+    store.getState().updateItem('one', { name: 'Real edit after cleanup' });
+    expect(store.getState().currentProject.items[0]).toMatchObject({ createdAt: BEFORE, updatedAt: NOW });
+  });
+
   it('keeps recency unchanged when catalog names or order change', () => {
     const store = setup();
     store.getState().updateCatalogNode('category', 'cat', { name: 'Equipment' });
