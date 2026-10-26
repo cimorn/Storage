@@ -10,6 +10,7 @@ function itemContent(item) {
     ...TEXT_FIELDS.map(field => String(item[field] ?? '')),
     [...new Set(locations)],
     item.isPackaged === true,
+    Array.isArray(item.variants) ? item.variants.map(row => [String(row.color ?? ''), String(row.size ?? ''), row.isPackaged === true]) : null,
     item.isPrivate === true,
     [...new Set(item.tags || [])].sort()
   ]);

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -35,57 +35,133 @@ function editor(initialItem = item, extra = {}) {
 const locationRow = number => within(screen.getByRole('group', { name: `存放位置 ${number}` }));
 
 describe('compact NAS item controls', () => {
-  it('preserves spaces while typing and formats both detail fields on blur or direct save', async () => {
-    const { user, onSave } = editor({ ...item, notes: '', specification: '' });
-    const specification = screen.getByLabelText('规格');
+  it('keeps style normalization while saving separate color and size fields', async () => {
+    const { user, onSave } = editor({ ...item, specification: '' });
     const style = screen.getByLabelText('款式');
-    await user.type(specification, '白色 　S');
-    expect(specification).toHaveValue('白色 　S');
-    await user.tab();
-    expect(specification).toHaveValue('白色 S');
+    await user.type(screen.getByLabelText('颜色1'), '白色');
+    await user.type(screen.getByLabelText('尺码1'), 'S');
     await user.type(style, '印花　镂空');
     expect(style).toHaveValue('印花　镂空');
-    fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '白色 S', specification: '印花 镂空' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '保存', exact: true })));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '白色', size: 'S', isPackaged: false }], specification: '印花 镂空' }));
   });
 
-  it('keeps existing field values under the renamed specification and style controls', async () => {
+  it('opens recognizable legacy details as a row and derives quantity from rows', async () => {
     const { user, onSave } = editor({ ...item, notes: '白色·S', specification: '印花·镂空', quantity: '1' });
-    expect(screen.getByLabelText('规格')).toHaveValue('白色 S');
-    expect(screen.getByLabelText('规格')).toHaveAttribute('placeholder', '白色 S');
+    expect(screen.getByLabelText('颜色1')).toHaveValue('白色');
+    expect(screen.getByLabelText('尺码1')).toHaveValue('S');
     expect(screen.getByLabelText('款式')).toHaveValue('印花 镂空');
     expect(screen.getByLabelText('款式')).toHaveAttribute('placeholder', '印花 镂空');
-    expect(screen.getByLabelText('数量')).toHaveValue('1');
-    await user.clear(screen.getByLabelText('规格'));
-    await user.type(screen.getByLabelText('规格'), '黑色·M');
+    expect(screen.queryByLabelText('数量')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('规格')).not.toBeInTheDocument();
+    expect(screen.getByText('共1件')).toBeInTheDocument();
+    await user.clear(screen.getByLabelText('颜色1'));
+    await user.type(screen.getByLabelText('颜色1'), '黑色');
+    await user.clear(screen.getByLabelText('尺码1'));
+    await user.type(screen.getByLabelText('尺码1'), 'M');
     await user.clear(screen.getByLabelText('款式'));
     await user.type(screen.getByLabelText('款式'), '纯色');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '黑色 M', specification: '纯色', quantity: '1' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '黑色', size: 'M', isPackaged: false }], specification: '纯色' }));
+    expect(String(onSave.mock.calls[0][0].quantity)).toBe('1');
   });
 
-  it('offers one ordinary file selector with privacy and packaging controls and puts tags last', async () => {
+  it('offers one ordinary file selector with privacy, keeps packaging per row, and puts tags last', async () => {
     const { container, user, onSave } = editor();
     expect(screen.queryByRole('button', { name: '手机拍照' })).not.toBeInTheDocument();
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
     expect(container.querySelector('input[type="file"]')).not.toHaveAttribute('capture');
     const controls = screen.getByRole('button', { name: '选择图片' }).parentElement;
     expect(within(controls).getByRole('checkbox', { name: '隐私区' })).not.toBeChecked();
-    await user.click(within(controls).getByRole('checkbox', { name: '包装' }));
+    expect(within(controls).queryByRole('checkbox', { name: /包装/ })).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText('包装1'));
     expect(container.querySelector('.item-editor-modal__form').lastElementChild).toHaveAttribute('aria-label', '物品标签');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ isPackaged: true, isPrivate: false }));
   });
 
-  it('allows packaging to be removed and shows packaging on the gallery card', async () => {
+  it('allows the only row packaging to be removed and shows packaging on the gallery card', async () => {
     const { user, onSave, unmount } = editor({ ...item, isPackaged: true });
-    await user.click(screen.getByRole('checkbox', { name: '包装' }));
+    await user.click(screen.getByLabelText('包装1'));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ isPackaged: false }));
     unmount();
     render(<ItemGalleryCard item={buildItemCardView({ ...item, isPackaged: true, locationPaths: ['房间 / 柜子 / 盒子', '另一个房间'] }, '')} />);
     expect(screen.getByText('有包装')).toBeInTheDocument();
     expect(screen.getByText('房间 · 柜子 · 盒子；另一个房间')).toBeInTheDocument();
+  });
+
+  it('adds physical item rows, preserves remaining rows after removal, and saves a derived mixed packaging summary', async () => {
+    const { user, onSave } = editor();
+    expect(screen.getByRole('button', { name: '移除规格1' })).toBeDisabled();
+    await user.type(screen.getByLabelText('颜色1'), '白色');
+    await user.type(screen.getByLabelText('尺码1'), 'S');
+    await user.click(screen.getByRole('button', { name: '添加规格' }));
+    await user.type(screen.getByLabelText('颜色2'), '黑色');
+    await user.type(screen.getByLabelText('尺码2'), 'M');
+    await user.click(screen.getByRole('button', { name: '添加规格' }));
+    await user.type(screen.getByLabelText('颜色3'), '蓝色');
+    await user.type(screen.getByLabelText('尺码3'), 'L');
+    await user.click(screen.getByLabelText('包装3'));
+    expect(screen.getByText('共3件')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '移除规格2' }));
+    expect(screen.getByLabelText('颜色2')).toHaveValue('蓝色');
+    expect(screen.getByLabelText('尺码2')).toHaveValue('L');
+    expect(screen.getByLabelText('包装2')).toBeChecked();
+    expect(screen.getByText('共2件')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      variants: [{ color: '白色', size: 'S', isPackaged: false }, { color: '蓝色', size: 'L', isPackaged: true }], isPackaged: true
+    }));
+    expect(String(onSave.mock.calls[0][0].quantity)).toBe('2');
+  });
+
+  it('shows current unsaved rows in a read-only information table and preserves the draft across keyboard tab switches', async () => {
+    const { user, onSave } = editor();
+    await user.type(screen.getByLabelText('颜色1'), '奶油白');
+    await user.type(screen.getByLabelText('尺码1'), 'S');
+    await user.click(screen.getByLabelText('包装1'));
+    await user.click(screen.getByRole('button', { name: '添加规格' }));
+    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel', { name: '信息页' });
+    const table = within(panel).getByRole('table');
+    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['颜色', '尺码', '有无包装']);
+    expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['奶油白S有包装', '——无包装']);
+    expect(within(panel).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    await user.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('tab', { name: '编辑页' })).toHaveFocus();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('奶油白');
+    expect(screen.getByLabelText('尺码1')).toHaveValue('S');
+    expect(screen.getByText('共2件')).toBeInTheDocument();
+  });
+
+  it('retains unrecognized original specification text and allows nonclothing rows with no color or size', async () => {
+    const { user, onSave } = editor({ ...item, notes: '备用／适配旧型号', quantity: '2' });
+    expect(screen.getByText('原规格')).toBeInTheDocument();
+    expect(screen.getByText('备用／适配旧型号')).toBeInTheDocument();
+    expect(screen.getByLabelText('颜色1')).toHaveValue('');
+    expect(screen.getByLabelText('尺码1')).toHaveValue('');
+    expect(screen.getByText('共2件')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '备用／适配旧型号', variants: [
+      { color: '', size: '', isPackaged: false }, { color: '', size: '', isPackaged: false }
+    ] }));
+  });
+
+  it.each(['若干', '1001'])('requires an explicit physical row count before replacing an ambiguous legacy quantity %s', async quantity => {
+    const { user, onSave } = editor({ ...item, quantity, notes: '旧物品规格' });
+    expect(screen.getByText(`原数量：${quantity}`)).toBeInTheDocument();
+    expect(screen.queryByLabelText('颜色1')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('请按实际件数添加规格后再保存');
+    expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '添加规格' }));
+    expect(screen.getByText('共1件')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '旧物品规格', variants: [{ color: '', size: '', isPackaged: false }] }));
+    expect(String(onSave.mock.calls[0][0].quantity)).toBe('1');
   });
 
   it('keeps accessible filter groups while labeling the root choices directly', () => {

@@ -36,6 +36,7 @@ function preserveOptionalMetadata(current,incoming){
   const items=Array.isArray(incoming.items)?incoming.items.map(item=>{
     const previous=previousItems.get(item?.id);if(!previous)return item;
     const next={...item};
+    if(!Object.hasOwn(item,'variants')&&Object.hasOwn(previous,'variants'))next.variants=previous.variants;
     if(!Object.hasOwn(item,'isPackaged')&&Object.hasOwn(previous,'isPackaged'))next.isPackaged=previous.isPackaged;
     if(!Object.hasOwn(item,'locationIds')&&Object.hasOwn(previous,'locationIds')){
       next.locationIds=(item.locationId||null)===(previous.locationId||null)?previous.locationIds:(item.locationId?[item.locationId]:[]);

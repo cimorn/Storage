@@ -1,3 +1,5 @@
+import { getItemVariants, withVariantSummary } from '../../../shared/item-variants.mjs';
+
 export const MAX_LEVELS = {
   category: 2,
   location: 3
@@ -402,6 +404,7 @@ export function sanitizeProject(project) {
       locationId: item.locationId || null,
       ...(Object.hasOwn(item, 'locationIds') ? { locationIds: getItemLocationIds(item) } : {}),
       ...optionalBoolean(item, 'isPackaged'),
+      ...(Object.hasOwn(item, 'variants') ? { variants: getItemVariants(item) } : {}),
       locationPath: '',
       imagePath: toText(item.imagePath),
       quantity: toText(item.quantity),
@@ -439,8 +442,8 @@ export function syncProjectItems(project) {
       if (!project.privacy?.locked && hasLocations && locationIds.some(id => !indexedProject.locations.has(id))) throw new Error('Unknown item location');
       const locationId = hasLocations ? locationIds[0] || null : item.locationId || null;
       return {
-        ...item,
         ...optionalBoolean(item, 'isPackaged'),
+        ...withVariantSummary(item),
         ...(hasLocations ? { locationIds, locationPaths: locationIds.map(id => buildNodePath(indexedProject.locations, id)) } : {}),
         locationId,
         ...(isItemPrivate(item, indexedProject) ? { isPrivate: true } : {}),

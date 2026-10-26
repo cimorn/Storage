@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { getItemVariants, MAX_ITEM_VARIANTS, withVariantSummary } from '../../../../shared/item-variants.mjs';
 
 import {
   completeSmartTagInput,
@@ -13,6 +14,13 @@ import {
 import { normalizeItemDetailInput } from './item-detail-text';
 import { createEmptyItemDraft } from './item-gallery-selectors';
 import { useImageAccess } from '../web/ImageAccessContext';
+import ItemVariantFields from './ItemVariantFields';
+import ItemInformationPage from './ItemInformationPage';
+
+let variantRowSequence = 0;
+function createVariantRow(row = { color: '', size: '', isPackaged: false }) {
+  return { ...row, rowKey: ++variantRowSequence };
+}
 
 function normalizeItem(item, categories, locations, mode = 'edit') {
   if (item) {
@@ -21,10 +29,11 @@ function normalizeItem(item, categories, locations, mode = 'edit') {
       barcode: item.barcode || item.code || '',
       code: item.barcode || item.code || '',
       name: item.name || '',
-      notes: normalizeItemDetailInput(item.notes),
+      notes: item.notes || '',
       brand: item.brand || '',
       specification: normalizeItemDetailInput(item.specification),
       quantity: item.quantity || '',
+      variants: getItemVariants(item).map(createVariantRow),
       categoryId: item.categoryId || '',
       locationId: item.locationId || '',
       locationIds: getItemLocationIds(item).length ? getItemLocationIds(item) : [''],
@@ -36,7 +45,7 @@ function normalizeItem(item, categories, locations, mode = 'edit') {
   }
 
   const empty = createEmptyItemDraft(categories, locations);
-  return { ...empty, locationIds: [empty.locationId || ''], isPrivate: false, isPackaged: false };
+  return { ...empty, variants: getItemVariants(empty).map(createVariantRow), locationIds: [empty.locationId || ''], isPrivate: false };
 }
 
 function buildCategorySelection(categories, categoryId) {
@@ -78,6 +87,8 @@ export default function ItemEditorModal({
   const [imageFeedback, setImageFeedback] = useState({ type: '', message: '' });
   const [saving, setSaving] = useState(false);
   const [pendingBrowserFile, setPendingBrowserFile] = useState(null);
+  const [activeTab, setActiveTab] = useState('edit');
+  const tabsRef = useRef(null);
   const stagedBrowserUploadRef = useRef(null);
   const stagedImageCopyRef = useRef(null);
   const editorGenerationRef = useRef(0);
@@ -113,6 +124,7 @@ export default function ItemEditorModal({
     }
     setDraft(normalizeItem(item, categories, locations, mode));
     setDirtyDraft(false);
+    setActiveTab('edit');
     setTagInput('');
     setImageFeedback({ type: '', message: '' });
     setSaving(false);
@@ -152,6 +164,32 @@ export default function ItemEditorModal({
   function updateDraft(patch) {
     setDraft((current) => ({ ...current, ...patch }));
     setDirtyDraft(true);
+  }
+
+  function updateVariant(rowKey, patch) {
+    updateDraft({ variants: draft.variants.map(row => row.rowKey === rowKey ? { ...row, ...patch } : row) });
+  }
+
+  function addVariant() {
+    if (draft.variants.length >= MAX_ITEM_VARIANTS) return;
+    updateDraft({ variants: [...draft.variants, createVariantRow()] });
+  }
+
+  function removeVariant(rowKey) {
+    if (draft.variants.length <= 1) return;
+    updateDraft({ variants: draft.variants.filter(row => row.rowKey !== rowKey) });
+  }
+
+  function handleTabKeyDown(event) {
+    const index = activeTab === 'edit' ? 0 : 1;
+    let nextIndex;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') nextIndex = 1 - index;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = 1;
+    else return;
+    event.preventDefault();
+    setActiveTab(nextIndex === 0 ? 'edit' : 'information');
+    tabsRef.current?.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
   }
 
   function handleBrowserFile(event) {
@@ -234,15 +272,6 @@ export default function ItemEditorModal({
       return;
     }
 
-    const nextItem = {
-      ...(mode === 'copy' ? {} : item),
-      ...draft,
-      notes: normalizeItemDetailInput(draft.notes),
-      specification: normalizeItemDetailInput(draft.specification),
-      locationIds: assignedLocationIds,
-      locationId: assignedLocationIds[0] || null,
-      tags: normalizeTagCodes(draft.tags)
-    };
     const saveGeneration = editorGenerationRef.current;
     const isCurrentSave = () => editorGenerationRef.current === saveGeneration;
 
@@ -250,6 +279,17 @@ export default function ItemEditorModal({
     setImageFeedback({ type: '', message: '' });
 
     try {
+      if (!draft.variants.length) throw new Error('原数量无法自动转换，请按实际件数添加规格后再保存');
+      const nextItem = withVariantSummary({
+        ...(mode === 'copy' ? {} : item),
+        ...draft,
+        notes: draft.notes,
+        variants: draft.variants.map(({ color, size, isPackaged }) => ({ color, size, isPackaged })),
+        specification: normalizeItemDetailInput(draft.specification),
+        locationIds: assignedLocationIds,
+        locationId: assignedLocationIds[0] || null,
+        tags: normalizeTagCodes(draft.tags)
+      });
       if (imageAccess) {
         if (!draft.name.trim()) throw new Error('请填写物品名称');
         if (!draft.categoryId || !categories.some((category) => category.id === draft.categoryId)) {
@@ -316,7 +356,18 @@ export default function ItemEditorModal({
           </button>
         </div>
 
+        <div className="item-editor-modal__tabs" role="tablist" aria-label="物品页面" ref={tabsRef} onKeyDown={handleTabKeyDown}>
+          <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑页</button>
+          <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息页</button>
+        </div>
+
         <div className="item-editor-modal__body">
+          {imageFeedback.message ? (
+            <p role={imageFeedback.type === 'error' ? 'alert' : 'status'} className={`image-feedback ${imageFeedback.type === 'error' ? 'is-error' : 'is-success'}`}>
+              {imageFeedback.message}
+            </p>
+          ) : null}
+          <div className="item-editor-modal__edit-panel" role="tabpanel" id="item-editor-edit-panel" aria-labelledby="item-editor-edit-tab" hidden={activeTab !== 'edit'}>
           <section className="item-editor-modal__media">
             <div className="web-item-image-selection" aria-label="物品图片选择状态">
               <strong>{pendingBrowserFile ? pendingBrowserFile.name : draft.imagePath ? mode === 'copy' ? '沿用原物品图片' : '已保存图片' : '尚未选择图片'}</strong>
@@ -333,35 +384,24 @@ export default function ItemEditorModal({
                     onChange={event => updateDraft({ isPrivate: event.target.checked })} />
                   <span>隐私区</span>
                 </label> : null}
-                <label className="web-item-option-control">
-                  <input type="checkbox" checked={draft.isPackaged} disabled={saving}
-                    onChange={event => updateDraft({ isPackaged: event.target.checked })} />
-                  <span>包装</span>
-                </label>
               </div>
               {canManagePrivacy && inheritedPrivate ? <p id="item-privacy-inheritance" className="privacy-inheritance-hint">所选分类或位置属于隐私区</p> : null}
               <input hidden ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
-              {imageFeedback.message ? (
-                <p role={imageFeedback.type === 'error' ? 'alert' : 'status'} className={`image-feedback ${imageFeedback.type === 'error' ? 'is-error' : 'is-success'}`}>
-                  {imageFeedback.message}
-                </p>
-              ) : null}
             </div>
           </section>
 
           <fieldset className="item-editor-modal__form" disabled={saving}>
-            <div className="form-row form-row--2">
+            <div className="form-row">
               <label className="field">
                 <span>名称</span>
                 <input autoFocus value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
               </label>
-              <label className="field">
-                <span>规格</span>
-                <input placeholder="白色 S" value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} onBlur={(event) => { const notes = normalizeItemDetailInput(event.target.value); if (notes !== draft.notes) updateDraft({ notes }); }} />
-              </label>
             </div>
 
-            <div className="form-row form-row--3">
+            <ItemVariantFields variants={draft.variants} notes={draft.notes} legacyQuantity={draft.quantity} maxVariants={MAX_ITEM_VARIANTS}
+              onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} />
+
+            <div className="form-row form-row--2">
               <label className="field">
                 <span>品牌</span>
                 <input value={draft.brand} onChange={(event) => updateDraft({ brand: event.target.value })} />
@@ -369,10 +409,6 @@ export default function ItemEditorModal({
               <label className="field">
                 <span>款式</span>
                 <input placeholder="印花 镂空" value={draft.specification} onChange={(event) => updateDraft({ specification: event.target.value })} onBlur={(event) => { const specification = normalizeItemDetailInput(event.target.value); if (specification !== draft.specification) updateDraft({ specification }); }} />
-              </label>
-              <label className="field">
-                <span>数量</span>
-                <input value={draft.quantity} onChange={(event) => updateDraft({ quantity: event.target.value })} />
               </label>
             </div>
 
@@ -516,6 +552,10 @@ export default function ItemEditorModal({
             </section>
 
           </fieldset>
+          </div>
+          <section role="tabpanel" id="item-editor-information-panel" aria-labelledby="item-editor-information-tab" hidden={activeTab !== 'information'}>
+            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} legacyQuantity={draft.quantity} /> : null}
+          </section>
         </div>
 
         <div className="dialog-actions item-editor-modal__actions">
