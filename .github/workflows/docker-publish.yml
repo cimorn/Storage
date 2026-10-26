@@ -51,6 +51,17 @@ jobs:
         run: node scripts/check-container.cjs storage-smoke:ci
       - name: Check portable Compose deployment
         run: node scripts/check-compose.cjs storage-smoke:ci
+      - name: Build and load ARM64 test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          tags: storage-smoke:arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Check ARM64 runtime and WebP codec
+        run: node scripts/check-container.cjs storage-smoke:arm64
       - name: Read release version
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         id: version

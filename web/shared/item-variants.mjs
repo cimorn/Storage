@@ -63,10 +63,11 @@ export function withVariantSummary(item = {}) {
 }
 
 export function formatItemVariants(item = {}) {
-  const details = getItemVariants(item)
-    .map(row => [row.color, row.size].filter(Boolean).join('·'))
-    .filter(Boolean);
-  if (details.length) return [...new Set(details)].join(' / ');
+  const rows = getItemVariants(item);
+  const colors = [...new Set(rows.map(row => row.color).filter(Boolean))].join('&');
+  const sizes = [...new Set(rows.map(row => row.size).filter(Boolean))].join('&');
+  const details = [colors, sizes].filter(Boolean).join('·');
+  if (details) return details;
   if (Array.isArray(item.variants) && parseLegacyVariant(item.notes)) return '';
   return text(item.notes);
 }

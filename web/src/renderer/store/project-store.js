@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { applyItemTimestamps } from '../lib/item-timestamps';
 import { getItemVariants, withVariantSummary } from '../../../shared/item-variants.mjs';
+import { getItemImageIds, withImageSummary } from '../../../shared/item-images.mjs';
 
 import {
   MAX_LEVELS,
@@ -77,6 +78,10 @@ function clearItemReferences(items, nodeIds, key) {
 
 function applyItemPatch(item, patch = {}, { replaceLocations = false } = {}) {
   const next = { ...item, ...patch, ...optionalBoolean(patch, 'isPackaged') };
+  if (Array.isArray(item.imagePaths) && Object.hasOwn(patch, 'imagePath') && !Object.hasOwn(patch, 'imagePaths') &&
+      (patch.imagePath || '') !== (item.imagePath || '')) {
+    next.imagePaths = [patch.imagePath, ...getItemImageIds(item).slice(1)].filter(Boolean);
+  }
   if (Array.isArray(item.variants) && Object.hasOwn(patch, 'isPackaged') && !Object.hasOwn(patch, 'variants')) {
     next.variants = item.variants.map(row => ({ ...row, isPackaged: patch.isPackaged }));
   }
@@ -84,7 +89,7 @@ function applyItemPatch(item, patch = {}, { replaceLocations = false } = {}) {
       (replaceLocations || (patch.locationId || null) !== (item.locationId || null))) {
     next.locationIds = patch.locationId ? [patch.locationId] : [];
   }
-  return withVariantSummary(next);
+  return withImageSummary(withVariantSummary(next));
 }
 
 function appendCatalogNode(entries, node) {
@@ -201,6 +206,7 @@ function createProjectState(set, get) {
           ...(Object.hasOwn(draft || {}, 'variants') ? { variants: getItemVariants(draft) } : {}),
           locationPath: '',
           imagePath: toText(draft?.imagePath),
+          ...(Object.hasOwn(draft || {}, 'imagePaths') ? { imagePaths: getItemImageIds(draft) } : {}),
           quantity: toText(draft?.quantity),
           specification: toText(draft?.specification),
           notes: toText(draft?.notes),

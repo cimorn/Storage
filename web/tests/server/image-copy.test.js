@@ -7,7 +7,8 @@ const { createInventoryService } = require('../../server/inventory-service');
 const { createMemoryRepository } = require('../../server/repository');
 const { createMemoryObjectStore } = require('../../server/oss-store');
 const { createApp } = require('../../server/app');
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=', 'base64');
+const png = require('pngjs').PNG.sync.write({width:4,height:4,data:Buffer.alloc(64,255)});
+const storedPng=(await require('../../server/image-transform').compressImage({bytes:png,mime:'image/png'})).bytes;
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
 async function setup(isPrivate = false) {
@@ -26,12 +27,12 @@ it('copies only committed accessible photos and retains independent original byt
   let project = await service.getProject();
   project.items.push({...source,id:'copy',name:'相机副本',imagePath:copied.imageId});
   project = await service.saveProject(project);
-  expect((await service.readImage(copied.imageId)).bytes).toEqual(png);
-  expect((await service.readImage(source.imagePath)).bytes).toEqual(png);
+  expect((await service.readImage(copied.imageId)).bytes).toEqual(storedPng);
+  expect((await service.readImage(source.imagePath)).bytes).toEqual(storedPng);
   expect(objects.keys()).toHaveLength(2);
   project.items = project.items.filter(item => item.id !== 'copy');
   await service.saveProject(project);
-  expect((await service.readImage(source.imagePath)).bytes).toEqual(png);
+  expect((await service.readImage(source.imagePath)).bytes).toEqual(storedPng);
   expect(objects.keys()).toHaveLength(1);
 });
 it('does not copy private photos or unbound uploads while locked', async () => {
@@ -46,7 +47,7 @@ it('does not copy private photos or unbound uploads while locked', async () => {
   all.items.push({...source,id:'copy',imagePath:copied.imageId});
   await service.saveProject(all,{includePrivate:true});
   expect((await service.getProject()).items).toEqual([]);
-  expect((await service.readImage(copied.imageId,{includePrivate:true})).bytes).toEqual(png);
+  expect((await service.readImage(copied.imageId,{includePrivate:true})).bytes).toEqual(storedPng);
 });
 it('requires web login, origin and CSRF for copy, and invalidates late private copy responses', async () => {
   const {service, source} = await setup(true);

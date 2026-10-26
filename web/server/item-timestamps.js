@@ -1,5 +1,7 @@
 'use strict';
 
+const {getItemImageIds}=require('../shared/item-images.mjs');
+
 const TEXT_FIELDS = ['barcode', 'code', 'name', 'brand', 'quantity', 'specification', 'notes', 'categoryId', 'imagePath'];
 
 function itemContent(item) {
@@ -9,6 +11,7 @@ function itemContent(item) {
   return JSON.stringify([
     ...TEXT_FIELDS.map(field => String(item[field] ?? '')),
     [...new Set(locations)],
+    getItemImageIds(item),
     item.isPackaged === true,
     Array.isArray(item.variants) ? item.variants.map(row => [String(row.color ?? ''), String(row.size ?? ''), row.isPackaged === true]) : null,
     item.isPrivate === true,

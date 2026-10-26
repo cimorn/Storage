@@ -56,48 +56,111 @@ async function selectPhoto(user, name = '相册照片.png') {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('NAS editor deferred image upload', () => {
-  it('does not retain staged preview bytes across successful saves even when a private item is absent from the returned ordinary project', async () => {
-    const user = userEvent.setup(); let sequence = 0;
-    const onSave = vi.fn(async () => ({ scope: 'ordinary', items: [] }));
-    const { api, access } = setup({ onSave, imageOptions: { maxBytes: 4 }, api: { uploadImage: vi.fn(async () => ({ imageId: `saved-${++sequence}` })), readImage: vi.fn(async () => new Blob(['1234'])) } });
-    await user.click(screen.getByLabelText('隐私区'));
-    for (let index = 1; index <= 3; index++) {
-      await user.upload(screen.getByLabelText('从相册选择图片'), new File(['1234'], `${index}.png`, { type: 'image/png' }));
-      await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-      await waitFor(() => expect(screen.getByRole('button', { name: '保存', exact: true })).toBeEnabled());
-      expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ isPrivate: true, imagePath: `saved-${index}` }));
-      expect(URL.createObjectURL).toHaveBeenCalledTimes(index - 1);
-      const preview = access.current.acquire(`ordinary-photo-${index}`);
-      await expect(preview.promise).resolves.toBe('blob:saved-image');
-      preview.release();
-      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(index - 1);
-    }
-    expect(api.uploadImage).toHaveBeenCalledTimes(3);
-    expect(api.readImage).toHaveBeenCalledTimes(3);
-    access.current.dispose();
-    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
-  });
-
-  it('keeps a selected File local without reading or uploading it and omits editor previews and quick fill', async () => {
+  it('previews selected files as local images without reading or uploading them', async () => {
     const user = userEvent.setup();
     const { api, readFile } = setup();
     await selectPhoto(user);
-
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toHaveAttribute('src', 'blob:saved-image');
     expect(api.uploadImage).not.toHaveBeenCalled();
     expect(readFile).not.toHaveBeenCalled();
     expect(api.readImage).not.toHaveBeenCalled();
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '向左旋转图片' })).not.toBeInTheDocument();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('快速填写')).not.toBeInTheDocument();
   });
 
-  it('does not request an existing image when opening the editor', () => {
-    const { api } = setup({ initialItem: { ...item, imagePath: 'already-saved-image' } });
-    expect(api.readImage).not.toHaveBeenCalled();
+  it('reads each saved image for an inline preview when opening the editor', async () => {
+    const { api } = setup({ initialItem: { ...item, imagePath: 'cover', imagePaths: ['cover', 'detail'] } });
+    expect(await screen.findByRole('img', { name: '已保存图片1' })).toHaveAttribute('src', 'blob:saved-image');
+    expect(await screen.findByRole('img', { name: '已保存图片2' })).toHaveAttribute('src', 'blob:saved-image');
+    expect(api.readImage.mock.calls.map(([id]) => id)).toEqual(['cover', 'detail']);
+  });
+
+  it('appends multiple selections, removes individual pending and saved images, and saves the first remaining image as cover', async () => {
+    const user = userEvent.setup();
+    const { api, onSave } = setup({ initialItem: { ...item, imagePath: 'cover', imagePaths: ['cover', 'detail'] }, api: { uploadImage: vi.fn().mockResolvedValueOnce({ imageId: 'first-upload' }).mockResolvedValueOnce({ imageId: 'third-upload' }) } });
+    const first = new File(['first'], 'first.png', { type: 'image/png' });
+    const second = new File(['second'], 'second.jpg', { type: 'image/jpeg' });
+    await user.upload(screen.getByLabelText('从相册选择图片'), [first, second]);
+    expect(screen.getByLabelText('从相册选择图片')).toHaveAttribute('multiple');
+    await selectPhoto(user, 'third.png');
+    expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(5);
+    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    await user.click(screen.getByRole('button', { name: '移除图片 3' }));
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
+    expect(api.uploadImage).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'detail', imagePaths: ['detail', 'first-upload', 'third-upload'] })));
+    expect(api.uploadImage).toHaveBeenCalledTimes(2);
+    expect(onSave.mock.calls[0][0].imagePaths.every(id => typeof id === 'string')).toBe(true);
+  });
+
+  it('allows removing every image and persists an empty array and primary path', async () => {
+    const user = userEvent.setup();
+    const { onSave } = setup({ initialItem: { ...item, imagePath: 'cover', imagePaths: ['cover', 'detail'] } });
+    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePaths: [], imagePath: '' }));
+  });
+
+  it('validates all selected file types and sizes before accepting a batch', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const { api } = setup();
+    const valid = new File(['photo'], 'valid.png', { type: 'image/png' });
+    const invalid = new File(['text'], 'bad.txt', { type: 'text/plain' });
+    await user.upload(screen.getByLabelText('从相册选择图片'), [valid, invalid]);
+    expect(screen.getByRole('alert')).toHaveTextContent('图片格式');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.getByText('已保存图片')).toBeInTheDocument();
+    const large = new File(['photo'], 'large.png', { type: 'image/png' });
+    Object.defineProperty(large, 'size', { value: 20 * 1024 * 1024 + 1 });
+    await user.upload(screen.getByLabelText('从相册选择图片'), [valid, large]);
+    expect(screen.getByRole('alert')).toHaveTextContent('20MB');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(api.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a whole batch above twenty total images while preserving existing selections', async () => {
+    const user = userEvent.setup();
+    const { api } = setup({ initialItem: { ...item, imagePaths: Array.from({ length: 19 }, (_, index) => `saved-${index}`) } });
+    await user.upload(screen.getByLabelText('从相册选择图片'), [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
+    expect(screen.getByRole('alert')).toHaveTextContent('20');
+    expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(19);
+    expect(api.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('retries a partially completed multi-file upload without reuploading the successful file', async () => {
+    const user = userEvent.setup();
+    const uploadImage = vi.fn().mockResolvedValueOnce({ imageId: 'first-id' }).mockRejectedValueOnce(new Error('第二张上传失败')).mockResolvedValueOnce({ imageId: 'second-id' });
+    const { onSave } = setup({ api: { uploadImage } });
+    await user.upload(screen.getByLabelText('从相册选择图片'), [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('第二张上传失败');
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePaths: ['first-id', 'second-id'], imagePath: 'first-id' })));
+    expect(uploadImage).toHaveBeenCalledTimes(3);
+  });
+
+  it('revokes local previews after removal, close, and a privacy access change and ignores a late upload', async () => {
+    const user = userEvent.setup();
+    let accessChanged; const upload = deferred();
+    const { api, onSave, rerenderEditor } = setup({ api: { onAccessChange: listener => { accessChanged = listener; return () => {}; }, uploadImage: vi.fn(() => upload.promise) } });
+    await selectPhoto(user, 'first.png');
+    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    await selectPhoto(user, 'second.png');
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(api.uploadImage).toHaveBeenCalledTimes(1));
+    act(() => accessChanged());
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+    await act(async () => upload.resolve({ imageId: 'late-private-upload' }));
+    expect(onSave).not.toHaveBeenCalled();
+    await selectPhoto(user, 'third.png');
+    rerenderEditor({ open: false });
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
   });
 
   it('keeps a selected File and information tab draft through an ordinary project refresh', async () => {
@@ -177,11 +240,11 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.getByLabelText('主分类')).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '关闭物品弹窗' })).toBeDisabled();
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     await act(async () => upload.resolve({ imageId: 'uploaded-after-classification' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'stationery', imagePath: 'uploaded-after-classification' }));
     expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled();
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     await act(async () => save.resolve());
     expect(screen.getByRole('button', { name: '保存' })).toBeEnabled();
     expect(screen.getByLabelText('名称')).toBeEnabled();
@@ -211,7 +274,7 @@ describe('NAS editor deferred image upload', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(await screen.findByText('保存断开')).toBeInTheDocument();
     expect(screen.getByText('相册照片.png')).toBeInTheDocument();
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     const ordinary = access.current.acquire('ordinary');
     await expect(ordinary.promise).resolves.toBe('blob:saved-image');
     ordinary.release();
@@ -221,35 +284,22 @@ describe('NAS editor deferred image upload', () => {
     expect(onSave.mock.calls.map(([draft]) => draft.imagePath)).toEqual(['staged-image', 'staged-image']);
   });
 
-  it.each(['cancel', 'unmount', 'replace-file'])('leaves preview capacity free after a failed save followed by %s', async (change) => {
+  it.each(['cancel', 'unmount', 'remove-file'])('revokes the local preview after a failed save followed by %s', async change => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const onSave = vi.fn().mockRejectedValueOnce(new Error('保存失败')).mockResolvedValueOnce(undefined);
-    let sequence = 0;
-    const { api, access, onClose, rerenderEditor } = setup({ onSave, imageOptions: { maxBytes: 5 }, api: { uploadImage: vi.fn(async () => ({ imageId: `selected-${++sequence}` })), readImage: vi.fn(async () => new Blob(['photo'])) } });
+    const onSave = vi.fn().mockRejectedValue(new Error('保存失败'));
+    const { onClose, rerenderEditor } = setup({ onSave });
     await selectPhoto(user, 'first.png');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByText('保存失败')).toBeInTheDocument();
-    expect(screen.getByText('first.png')).toBeInTheDocument();
     if (change === 'cancel') {
       await user.click(screen.getByRole('button', { name: '取消', exact: true }));
       expect(onClose).toHaveBeenCalledTimes(1);
       rerenderEditor({ open: false });
     } else if (change === 'unmount') rerenderEditor({ editorPresent: false });
-    else {
-      await selectPhoto(user, 'second.png');
-      await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
-      expect(onSave.mock.calls.map(([draft]) => draft.imagePath)).toEqual(['selected-1', 'selected-2']);
-    }
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
-    const normal = access.current.acquire('ordinary');
-    await expect(normal.promise).resolves.toBe('blob:saved-image');
-    normal.release();
-    expect(api.uploadImage).toHaveBeenCalledTimes(change === 'replace-file' ? 2 : 1);
-    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
-    access.current.dispose();
-    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    else await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:saved-image');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('preserves a dirty draft and selected File when the same record and catalogs refresh', async () => {
@@ -297,7 +347,7 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await act(async () => upload.resolve({ imageId: 'obsolete-upload' }));
     expect(onSave).not.toHaveBeenCalled();
-    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:saved-image');
   });
 
   it('starts a fresh draft on record switch and ignores the previous record upload', async () => {

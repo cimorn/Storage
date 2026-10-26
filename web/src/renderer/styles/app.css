@@ -1032,6 +1032,9 @@ button:not(:disabled):hover {
 }
 
 .item-gallery-card__image-shell {
+  position: relative;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
   aspect-ratio: 1 / 0.86;
   overflow: hidden;
   background:
@@ -1046,6 +1049,19 @@ button:not(:disabled):hover {
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
+}
+
+.item-gallery-card__image-count {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  pointer-events: none;
 }
 
 .item-gallery-card__image--placeholder {

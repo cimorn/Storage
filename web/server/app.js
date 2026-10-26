@@ -81,6 +81,17 @@ function createApp({ service, config, authOptions, staticDir = path.resolve(__di
     res.type(image.mime).send(image.bytes);
   });
   const requirePrivacy = (req, res, next) => req.includePrivate ? next() : next(problem(403, 'PRIVACY_REQUIRED', '请先打开隐私区'));
+  app.post('/api/images/optimize', requirePrivacy, async (req, res) => {
+    const assertAuthorized = () => {
+      if (auth.session(req) !== req.storageSession) throw problem(401, 'AUTH_REQUIRED', '请先输入访问密码');
+      if (!auth.hasPrivacy(req.storageSession, req.get('X-Storage-Privacy'))) throw problem(403, 'PRIVACY_REQUIRED', '隐私区已关闭，请重新打开');
+    };
+    let result;
+    try { result = await service.optimizeImages({ includePrivate: true, assertAuthorized }); }
+    catch (error) { assertAuthorized(); throw error; }
+    assertAuthorized();
+    res.json(result);
+  });
   app.get('/api/backup', requirePrivacy, async (req, res) => {
     const backup = await service.backup();
     const images = Object.create(null);

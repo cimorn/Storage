@@ -1,4 +1,5 @@
 import { getItemVariants, withVariantSummary } from '../../../shared/item-variants.mjs';
+import { getItemImageIds, withImageSummary } from '../../../shared/item-images.mjs';
 
 export const MAX_LEVELS = {
   category: 2,
@@ -407,6 +408,7 @@ export function sanitizeProject(project) {
       ...(Object.hasOwn(item, 'variants') ? { variants: getItemVariants(item) } : {}),
       locationPath: '',
       imagePath: toText(item.imagePath),
+      ...(Object.hasOwn(item, 'imagePaths') ? { imagePaths: getItemImageIds(item) } : {}),
       quantity: toText(item.quantity),
       specification: toText(item.specification),
       notes: toText(item.notes),
@@ -443,7 +445,7 @@ export function syncProjectItems(project) {
       const locationId = hasLocations ? locationIds[0] || null : item.locationId || null;
       return {
         ...optionalBoolean(item, 'isPackaged'),
-        ...withVariantSummary(item),
+        ...withImageSummary(withVariantSummary(item)),
         ...(hasLocations ? { locationIds, locationPaths: locationIds.map(id => buildNodePath(indexedProject.locations, id)) } : {}),
         locationId,
         ...(isItemPrivate(item, indexedProject) ? { isPrivate: true } : {}),

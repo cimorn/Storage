@@ -6,7 +6,8 @@ const require = createRequire(import.meta.url);
 const { createInventoryService } = require('../../server/inventory-service');
 const { createMemoryRepository } = require('../../server/repository');
 const { createMemoryObjectStore } = require('../../server/oss-store');
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=', 'base64');
+const png = require('pngjs').PNG.sync.write({width:4,height:4,data:Buffer.alloc(64,255)});
+const storedPng=(await require('../../server/image-transform').compressImage({bytes:png,mime:'image/png'})).bytes;
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 async function setup(options = {}, count = 3) {
   const objects = createMemoryObjectStore();
@@ -25,11 +26,11 @@ describe('bounded encrypted image reads', () => {
     const get = objects.get; let calls = 0;
     objects.get = async (key) => ++calls === 1 ? Buffer.from('corrupt ciphertext') : get(key);
     await expect(service.readImage(ids[0])).rejects.toMatchObject({ code: 'STORAGE_UNAVAILABLE' });
-    expect((await service.readImage(ids[0])).bytes).toEqual(png);
+    expect((await service.readImage(ids[0])).bytes).toEqual(storedPng);
     expect(calls).toBe(2);
   });
 
-  it.each([{ maxBytes: 300, maxEntries: 100 }, { maxBytes: 4096, maxEntries: 1 }])('enforces the independent cache limit %j', async (imageCacheOptions) => {
+  it.each([{ maxBytes: 200, maxEntries: 100 }, { maxBytes: 4096, maxEntries: 1 }])('enforces the independent cache limit %j', async (imageCacheOptions) => {
     const { service, objects, ids } = await setup({ imageCacheOptions }, 2);
     const downloads = vi.spyOn(objects, 'get');
     await service.readImage(ids[0]); await service.readImage(ids[1]); await service.readImage(ids[0]);
@@ -44,7 +45,7 @@ describe('bounded encrypted image reads', () => {
     const reads = [service.readImage(ids[0]), service.readImage(ids[0])];
     await vi.waitFor(() => expect(downloads).toBe(1));
     gate.resolve();
-    expect((await Promise.all(reads)).map((image) => image.bytes)).toEqual([png, png]);
+    expect((await Promise.all(reads)).map((image) => image.bytes)).toEqual([storedPng, storedPng]);
     await service.readImage(ids[0]); expect(downloads).toBe(1);
     time += 101; await service.readImage(ids[0]); expect(downloads).toBe(2);
   });
@@ -68,7 +69,7 @@ describe('bounded encrypted image reads', () => {
     objects.get = async (key) => { if (++attempts <= 2) throw new Error('temporary upstream failure'); return get(key); };
     await expect(service.readImage(ids[0])).rejects.toMatchObject({ code: 'STORAGE_UNAVAILABLE' });
     expect(attempts).toBe(2);
-    expect((await service.readImage(ids[0])).bytes).toEqual(png);
+    expect((await service.readImage(ids[0])).bytes).toEqual(storedPng);
     expect(attempts).toBe(3);
   });
 
@@ -114,12 +115,12 @@ describe('bounded encrypted image reads', () => {
     const downloads = vi.spyOn(objects, 'get');
     await expect(service.readImage(ids[0])).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(downloads).not.toHaveBeenCalled();
-    expect((await service.readImage(ids[0], { includePrivate: true })).bytes).toEqual(png);
+    expect((await service.readImage(ids[0], { includePrivate: true })).bytes).toEqual(storedPng);
     expect(downloads).not.toHaveBeenCalled();
     project = await service.getProject({ includePrivate: true });
     project.categories = [{ id: 'moved', name: '新分类', parentId: null, level: 1 }]; project.items[0].categoryId = 'moved';
     await service.saveProject(project, { includePrivate: true }); downloads.mockClear();
-    expect((await service.readImage(ids[0], { includePrivate: true })).bytes).toEqual(png);
+    expect((await service.readImage(ids[0], { includePrivate: true })).bytes).toEqual(storedPng);
     expect(downloads).toHaveBeenCalledTimes(1);
   });
 });
