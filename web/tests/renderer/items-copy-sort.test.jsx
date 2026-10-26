@@ -33,6 +33,8 @@ async function openCopy(user) {
   await user.click(screen.getByRole('button', { name: '复制新增', exact: true }));
 }
 beforeEach(() => {
+  URL.createObjectURL = vi.fn(() => 'blob:local');
+  URL.revokeObjectURL = vi.fn();
   access.current = { copy: vi.fn().mockResolvedValue({ imageId: 'independent-image' }), upload: vi.fn().mockResolvedValue({ imageId: 'replacement-image' }) };
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -91,6 +93,15 @@ describe('copy a saved item into a new draft', () => {
     expect(screen.getByLabelText('包装2')).toBeChecked();
   });
 
+  it('does not save source image references when image copying is unavailable', async () => {
+    access.current = null;
+    const onSave = vi.fn();
+    render(<ItemEditorModal open mode="copy" item={source} categories={categories} locations={locations} onSave={onSave} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('图片复制');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('copies the saved version rather than silently carrying unsaved edits across', async () => {
     const { user, onSaveItem } = setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -115,7 +126,7 @@ describe('copy a saved item into a new draft', () => {
     expect(source.variants).toEqual([{ color: '白色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: true }]);
   });
 
-  it('uses a replacement file without copying the original photo', async () => {
+  it('appends a selected file while independently copying the saved original photo', async () => {
     const { user, onCreateItem } = setup();
     await openCopy(user);
     const file = new File(['new-photo'], 'new.png', { type: 'image/png' });
@@ -123,9 +134,48 @@ describe('copy a saved item into a new draft', () => {
     expect(access.current.upload).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
-    expect(access.current.copy).not.toHaveBeenCalled();
+    expect(access.current.copy).toHaveBeenCalledExactlyOnceWith('original-image');
     expect(access.current.upload).toHaveBeenCalledExactlyOnceWith(file);
-    expect(onCreateItem.mock.calls[0][0].imagePath).toBe('replacement-image');
+    expect(onCreateItem.mock.calls[0][0]).toMatchObject({ imagePath: 'independent-image', imagePaths: ['independent-image', 'replacement-image'] });
+  });
+
+  it('copies every saved image in order and reuses partial successes on retry', async () => {
+    const { user, onCreateItem } = setup({ ...source, imagePaths: ['original-image', 'second-original'] });
+    access.current.copy.mockResolvedValueOnce({ imageId: 'first-copy' }).mockRejectedValueOnce(new Error('第二张复制失败')).mockResolvedValueOnce({ imageId: 'second-copy' });
+    await openCopy(user);
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('第二张复制失败');
+    expect(onCreateItem).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
+    expect(access.current.copy.mock.calls.map(([id]) => id)).toEqual(['original-image', 'second-original', 'second-original']);
+    expect(onCreateItem.mock.calls[0][0]).toMatchObject({ imagePaths: ['first-copy', 'second-copy'], imagePath: 'first-copy' });
+  });
+
+  it('reuses every copied source image when an appended upload fails before record creation', async () => {
+    const { user, onCreateItem } = setup({ ...source, imagePaths: ['original-image', 'second-original'] });
+    access.current.copy.mockImplementation(async id => ({ imageId: `copy-${id}` }));
+    access.current.upload.mockRejectedValueOnce(new Error('上传失败')).mockResolvedValueOnce({ imageId: 'uploaded-id' });
+    await openCopy(user);
+    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['photo'], 'new.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('上传失败');
+    expect(onCreateItem).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
+    expect(access.current.copy.mock.calls.map(([id]) => id)).toEqual(['original-image', 'second-original']);
+    expect(access.current.upload).toHaveBeenCalledTimes(2);
+    expect(onCreateItem.mock.calls[0][0].imagePaths).toEqual(['copy-original-image', 'copy-second-original', 'uploaded-id']);
+  });
+
+  it('removes a saved source image from a copy without copying or retaining its ID', async () => {
+    const { user, onCreateItem } = setup({ ...source, imagePaths: ['original-image', 'second-original'] });
+    await openCopy(user);
+    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
+    expect(access.current.copy).toHaveBeenCalledExactlyOnceWith('second-original');
+    expect(onCreateItem.mock.calls[0][0].imagePaths).toEqual(['independent-image']);
   });
 
   it('reuses a successful photo copy when the record save fails and is retried', async () => {
@@ -138,6 +188,18 @@ describe('copy a saved item into a new draft', () => {
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(2));
     expect(access.current.copy).toHaveBeenCalledTimes(1);
     expect(onCreateItem.mock.calls.map(([draft]) => draft.imagePath)).toEqual(['independent-image', 'independent-image']);
+  });
+
+  it('creates independent images again if a completed copy editor remains open for another creation', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    access.current.copy.mockResolvedValueOnce({ imageId: 'first-created-photo' }).mockResolvedValueOnce({ imageId: 'second-created-photo' });
+    render(<ItemEditorModal open mode="copy" item={source} categories={categories} locations={locations} onSave={onSave} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: '保存', exact: true }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(onSave.mock.calls.map(([draft]) => draft.imagePaths)).toEqual([['first-created-photo'], ['second-created-photo']]);
   });
 
   it('retains the draft after a failed photo copy and retries without creating a record first', async () => {

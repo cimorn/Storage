@@ -7,7 +7,8 @@ const { createInventoryService } = load('../../server/inventory-service');
 const { createMemoryRepository } = load('../../server/repository');
 const { createMemoryObjectStore } = load('../../server/oss-store');
 
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=', 'base64');
+const png = require('pngjs').PNG.sync.write({width:4,height:4,data:Buffer.alloc(64,255)});
+const storedPng=(await require('../../server/image-transform').compressImage({bytes:png,mime:'image/png'})).bytes;
 function fixture() {
   return { meta: {name:'家中物品',tagPrefixes:{normal:'N',secret:'SECRET'}}, categories:[
     {id:'normal',name:'工具',parentId:null,level:1}, {id:'empty',name:'空分类',parentId:null,level:1},
@@ -87,7 +88,7 @@ describe('NAS encrypted inventory service', () => {
     all.items[1].imagePath=imageId;
     await service.saveProject(all,{includePrivate:true});
     await expect(service.readImage(imageId)).rejects.toMatchObject({code:'NOT_FOUND'});
-    expect((await service.readImage(imageId,{includePrivate:true})).bytes).toEqual(png);
+    expect((await service.readImage(imageId,{includePrivate:true})).bytes).toEqual(storedPng);
     expect(JSON.stringify(await repository.read())).not.toMatch(/秘密物品|Look|hidden-location/);
     const stored=await objects.get(objects.keys()[0]);
     expect(stored.includes(png)).toBe(false);
@@ -114,7 +115,7 @@ describe('NAS encrypted inventory service', () => {
     expect(objects.keys()).toHaveLength(1);
     expect(objects.keys()[0]).not.toBe(oldKey);
     expect(decodeURIComponent(objects.keys()[0])).toContain('新工具');
-    expect((await service.readImage(imageId)).bytes).toEqual(png);
+    expect((await service.readImage(imageId)).bytes).toEqual(storedPng);
     project=await service.getProject();project.items=[];
     await service.saveProject(project);
     expect(objects.keys()).toHaveLength(0);
@@ -133,7 +134,7 @@ describe('NAS encrypted inventory service', () => {
     await restarted.retryPending();
     expect((await restarted.getProject()).categories[0].name).toBe('移动后');
     expect(objects.keys()).not.toContain(oldKey);
-    expect((await restarted.readImage(imageId)).bytes).toEqual(png);
+    expect((await restarted.readImage(imageId)).bytes).toEqual(storedPng);
   });
   it('resumes deletion failure without deleting any unrelated object',async()=>{
     const {service,objects,repository,encryptionKey}=await seeded();
@@ -185,7 +186,7 @@ describe('NAS encrypted inventory service', () => {
       expect(objects.keys()).toHaveLength(2);
       timer.mockReturnValue(originalNow+24*60*60*1000-1);await service.retryPending();expect(objects.keys()).toHaveLength(2);
       timer.mockReturnValue(originalNow+24*60*60*1000+1);await service.retryPending();expect(objects.keys()).toHaveLength(1);
-      expect((await service.readImage(bound.imageId)).bytes).toEqual(png);
+      expect((await service.readImage(bound.imageId)).bytes).toEqual(storedPng);
       await expect(service.readImage(imageId,{includePrivate:true})).rejects.toMatchObject({code:'NOT_FOUND'});
     }finally{timer.mockRestore();}
   });
@@ -196,7 +197,7 @@ describe('NAS encrypted inventory service', () => {
     project=await service.getProject();project.categories[0].name='损坏复制';
     await expect(service.saveProject(project)).rejects.toMatchObject({code:'STORAGE_UNAVAILABLE'});
     expect(objects.keys()).toContain(original);
-    objects.copy=copy;await service.retryPending();expect((await service.readImage(imageId)).bytes).toEqual(png);
+    objects.copy=copy;await service.retryPending();expect((await service.readImage(imageId)).bytes).toEqual(storedPng);
   });
   it('preserves deferred cleanup through another save while current image reads remain available',async()=>{
     const {service,objects}=await seeded();const {imageId}=await service.uploadImage({bytes:png,mime:'image/png'});
@@ -204,7 +205,7 @@ describe('NAS encrypted inventory service', () => {
     const originalDelete=objects.delete;objects.delete=async()=>{throw new Error('temporary');};
     project=await service.getProject();project.categories[0].name='第一次移动';
     const first=await service.saveProject(project);expect(first.storageWarning.code).toBe('CLEANUP_PENDING');
-    expect((await service.readImage(imageId)).bytes).toEqual(png);
+    expect((await service.readImage(imageId)).bytes).toEqual(storedPng);
     project=await service.getProject();project.categories[0].name='第二次移动';
     const second=await service.saveProject(project);expect(second.revision).toBe(first.revision+1);
     expect((await service.retryPending()).cleanupPending).toBe(true);
@@ -219,7 +220,7 @@ describe('NAS encrypted inventory service', () => {
     project=await service.getProject();project.categories[0].name='提交冲突';
     await expect(service.saveProject(project)).rejects.toMatchObject({code:'CONFLICT'});
     expect(objects.keys()).toContain(oldKey);repository.compareAndSwap=originalCas;
-    await service.retryPending();expect(objects.keys()).not.toContain(oldKey);expect((await service.readImage(imageId)).bytes).toEqual(png);
+    await service.retryPending();expect(objects.keys()).not.toContain(oldKey);expect((await service.readImage(imageId)).bytes).toEqual(storedPng);
   });
   it('supports removing a public tag prefix while preserving private prefixes',async()=>{
     const {service}=await seeded();const project=await service.getProject();delete project.meta.tagPrefixes.normal;
@@ -236,7 +237,7 @@ describe('NAS encrypted inventory service', () => {
   it('accepts a BMP with a valid bitmap header and rejects forged BMP data',async()=>{
     const {service}=await seeded();const bmp=Buffer.alloc(58);bmp.write('BM');bmp.writeUInt32LE(58,2);bmp.writeUInt32LE(54,10);bmp.writeUInt32LE(40,14);bmp.writeInt32LE(1,18);bmp.writeInt32LE(1,22);bmp.writeUInt16LE(1,26);bmp.writeUInt16LE(24,28);bmp.writeUInt32LE(4,34);
     const {imageId}=await service.uploadImage({bytes:bmp,mime:'image/bmp'});const project=await service.getProject();project.items[0].imagePath=imageId;await service.saveProject(project);
-    expect(await service.readImage(imageId)).toEqual({bytes:bmp,mime:'image/bmp'});
+    expect((await service.readImage(imageId)).mime).toBe('image/webp');
     const forged=Buffer.from(bmp);forged.writeUInt32LE(8000,10);
     await expect(service.uploadImage({bytes:forged,mime:'image/bmp'})).rejects.toMatchObject({code:'INVALID_IMAGE'});
     await expect(service.uploadImage({bytes:Buffer.from('BMfake'),mime:'image/bmp'})).rejects.toMatchObject({code:'INVALID_IMAGE'});
@@ -305,11 +306,11 @@ describe('NAS encrypted inventory service', () => {
     let project=await service.getProject({includePrivate:true});project.items[1].imagePath=imageId;await service.saveProject(project,{includePrivate:true});
     const data=await service.backup();
     expect(data.project.items).toHaveLength(2);
-    expect(data.images[imageId]).toEqual({bytes:png,mime:'image/png'});
+    expect(data.images[imageId]).toEqual({bytes:storedPng,mime:'image/webp'});
     expect(JSON.stringify(data)).not.toMatch(/encryptionKey|accessKeySecret|Storage\//);
     const target=setup().service;await target.importProject(data.project,{images:data.images,includePrivate:true});
     const restored=await target.getProject({includePrivate:true});
-    expect((await target.readImage(restored.items[1].imagePath,{includePrivate:true})).bytes).toEqual(png);
+    expect((await target.readImage(restored.items[1].imagePath,{includePrivate:true})).bytes).toEqual(storedPng);
     await expect(target.importProject(fixture(),{includePrivate:true})).rejects.toMatchObject({code:'NOT_EMPTY',status:409});
   });
   it('does not return an empty project when repository reads fail or the key is wrong',async()=>{

@@ -172,7 +172,7 @@ describe('catalog privacy during cached image reads', () => {
   it.each(['categories', 'locations'])('revokes delayed and warm image reads after %s privacy changes', async key => {
     const p = fixture(); p.items[0].locationIds = ['other', 'box'];
     const { service, options } = await setup(p);
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=', 'base64');
+    const png = require('pngjs').PNG.sync.write({width:4,height:4,data:Buffer.alloc(64,255)});
     const { imageId } = await service.uploadImage({ bytes: png, mime: 'image/png' });
     let project = await service.getProject({ includePrivate: true }); project.items[0].imagePath = imageId;
     await service.saveProject(project, { includePrivate: true });
@@ -184,6 +184,6 @@ describe('catalog privacy during cached image reads', () => {
     try { await service.saveProject(project, { includePrivate: true }); } finally { release(); }
     expect(await reading).toMatchObject({ code: 'NOT_FOUND' });
     await expect(service.readImage(imageId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    expect((await service.readImage(imageId, { includePrivate: true })).bytes).toEqual(png);
+    expect((await service.readImage(imageId, { includePrivate: true })).bytes).toEqual((await require('../../server/image-transform').compressImage({bytes:png,mime:'image/png'})).bytes);
   });
 });

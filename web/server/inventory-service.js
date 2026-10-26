@@ -1,12 +1,14 @@
 'use strict';
 const {applyItemTimestamps}=require('./item-timestamps');
+const {getItemImageIds}=require('../shared/item-images.mjs');
+const {compressImage,IMAGE_OPTIMIZATION_VERSION}=require('./image-transform');
 const {randomUUID,createHash}=require('node:crypto');
 const {StorageError,safeError}=require('./errors');
 const {normalizeKey,encryptBytes,decryptBytes}=require('./crypto');
 const {validateProject,projectPublicProjection,isPrivateItem,lineage,getItemLocationIds,createPrivacyClassifier}=require('./project-validation');
 const {createBoundedExecutor,createEncryptedImageCache}=require('./encrypted-image-cache');
 const {createCardImageExecutor}=require('./card-image-executor');
-const CARD_VERSION='card-v1-384-q65';
+const CARD_VERSION='card-webp-v2-384-q65';
 const MAX_IMAGE=20*1024*1024;
 const STAGED_MAX_AGE=24*60*60*1000;
 const STATE_AAD='nas-storage:inventory:v1';
@@ -37,6 +39,12 @@ function preserveOptionalMetadata(current,incoming){
     const previous=previousItems.get(item?.id);if(!previous)return item;
     const next={...item};
     if(!Object.hasOwn(item,'variants')&&Object.hasOwn(previous,'variants'))next.variants=previous.variants;
+    if(!Object.hasOwn(item,'imagePaths')&&Object.hasOwn(previous,'imagePaths')){
+      // Old tabs only know the primary: replace/remove that slot, retaining
+      // photos the tab could not see. New clients send [] to remove all.
+      const previousIds=getItemImageIds(previous);
+      next.imagePaths=!Object.hasOwn(item,'imagePath')||(item.imagePath||'')===(previous.imagePath||'')?previousIds:[...(item.imagePath?[item.imagePath]:[]),...previousIds.slice(1)];
+    }
     if(!Object.hasOwn(item,'isPackaged')&&Object.hasOwn(previous,'isPackaged'))next.isPackaged=previous.isPackaged;
     if(!Object.hasOwn(item,'locationIds')&&Object.hasOwn(previous,'locationIds')){
       next.locationIds=(item.locationId||null)===(previous.locationId||null)?previous.locationIds:(item.locationId?[item.locationId]:[]);
@@ -113,7 +121,7 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
     return decoded;
   }
   function authorizeImage(state,imageId,includePrivate){
-    const item=state.project.items.find(x=>x.imagePath===imageId);
+    const item=state.project.items.find(x=>getItemImageIds(x).includes(imageId));
     const record=state.images[imageId];
     if(!item||!record||!record.ready||record.ownerId!==item.id||(!includePrivate&&isPrivateItem(item,state.project,rules)))throw new StorageError('NOT_FOUND');
     return record;
@@ -122,8 +130,8 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
     const head=await objects.head(target);if(head.size!==record.encryptedSize)throw new StorageError();
     decodePhoto(record,await objects.get(target));
   }
-  async function resume(){
-    let snapshot=await readState();let state=snapshot.state;
+  async function resume({assertAuthorized=()=>{}}={}){
+    let snapshot=await readState();let state=snapshot.state;let optimizationStats;
     // Register cleanup before deleting expired unbound uploads. Fresh upload
     // intents may belong to another active process and must be left intact.
     const expired=Object.values(state.images).filter(x=>!x.ownerId&&Number.isFinite(x.createdAt)&&Date.now()-x.createdAt>=STAGED_MAX_AGE);
@@ -132,6 +140,64 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       state.pending={id:randomUUID(),phase:'cleanup',keys:expired.map(x=>x.key)};snapshot=await writeState(snapshot,state);
     }
     if(!state.pending)return snapshot;
+    if(state.pending.phase==='optimize'){
+      for(let index=0;index<state.pending.transforms.length;index++){
+        if(state.pending.transforms[index].done)continue;
+        await assertAuthorized();
+        const imageId=state.pending.transforms[index].imageId;
+        const source=state.images[imageId];
+        const item=state.project.items.find(item=>item.id===source.ownerId);
+        if(!item||!getItemImageIds(item).includes(imageId))throw new StorageError();
+        let original,transformed;
+        try{
+          original=decodePhoto(source,await objects.get(source.key));
+          transformed=await compressValidated({bytes:original,mime:source.mime});
+        }catch(error){
+          // Missing or corrupt source objects and decoder failures must not
+          // strand project reads behind a permanently failing journal. Keep
+          // every active generation; a later explicit attempt can retry even
+          // when this source failure was transient.
+          const active=new Set(Object.values(state.images).map(image=>image.key));
+          const aborted=clone(state);aborted.pending={id:state.pending.id,phase:'cleanup',keys:[...new Set(state.pending.cleanup)].filter(objectKey=>!active.has(objectKey))};
+          await writeState(snapshot,aborted);await resume();
+          throw error;
+        }
+        await assertAuthorized();
+        // Each attempt uses a new destination, even if another process resumes
+        // this journal concurrently. A delayed PUT can never overwrite a
+        // generation that another process has already published.
+        const target=destination(state.project,item,imageId,randomUUID());
+        const registered=clone(state);registered.pending.cleanup.push(target);
+        snapshot=await writeState(snapshot,registered);state=registered;
+        const encrypted=Buffer.from(JSON.stringify(encryptBytes(transformed.bytes,key,`nas-storage:image:${imageId}:v1`)),'utf8');
+        const record={...source,key:target,mime:transformed.mime,digest:digest(transformed.bytes),encryptedSize:encrypted.length,optimizationVersion:IMAGE_OPTIMIZATION_VERSION};
+        try{
+          await assertAuthorized();
+          await objects.put(target,encrypted,'application/octet-stream');await verifyPhoto(record,target);
+          await assertAuthorized();
+          const checkpoint=clone(state);checkpoint.pending.targetImages[imageId]=record;checkpoint.pending.transforms[index].done=true;
+          checkpoint.pending.stats.beforeBytes+=original.length;checkpoint.pending.stats.afterBytes+=transformed.bytes.length;
+          checkpoint.pending.stats.optimizedCount++;
+          snapshot=await writeState(snapshot,checkpoint);state=checkpoint;
+        }catch(error){
+          // A competing process can finish cleanup before this attempt's PUT
+          // returns. Reap this attempt's unique key if no committed or queued
+          // generation uses it; otherwise recovery owns it.
+          try{
+            const current=(await readState()).state;
+            const retained=[...Object.values(current.images),...Object.values(current.pending?.targetImages||{})].some(image=>image.key===target);
+            if(!retained)await objects.delete(target);
+          }catch{/* The journal still registers this key for retry cleanup. */}
+          throw error;
+        }
+      }
+      await assertAuthorized();
+      const operation=state.pending;optimizationStats={...operation.stats,savedBytes:operation.stats.beforeBytes-operation.stats.afterBytes};
+      const active=new Set(Object.values(operation.targetImages).map(image=>image.key));
+      const next=clone(state);next.images=operation.targetImages;next.projectRevision=operation.targetRevision;
+      next.pending={id:operation.id,phase:'cleanup',keys:[...new Set(operation.cleanup)].filter(objectKey=>!active.has(objectKey))};
+      snapshot=await writeState(snapshot,next);state=next;
+    }
     const operation=state.pending;
     if(operation.phase==='copy'){
       for(const copy of operation.copies){
@@ -146,11 +212,11 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       const active=new Set(Object.values(state.images).map(x=>x.key));
       for(const objectKey of state.pending.keys){
         if(active.has(objectKey))throw new StorageError();
-        try{await objects.delete(objectKey);}catch{return snapshot;}
+        try{await objects.delete(objectKey);}catch{return {...snapshot,optimizationStats};}
       }
       const next=clone(state);next.pending=null;snapshot=await writeState(snapshot,next);
     }
-    return snapshot;
+    return {...snapshot,optimizationStats};
   }
   function destination(project,item,imageId,operationId){
     // Every operation receives a fresh generation. A delayed cleanup from an
@@ -160,9 +226,8 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
   }
   async function commitProject(snapshot,project){
     const state=snapshot.state;const targetImages=clone(state.images);const used=new Set();const copies=[];const cleanup=state.pending?.phase==='cleanup'?[...state.pending.keys]:[];const operationId=randomUUID();
-    for(const item of project.items){
-      if(!item.imagePath)continue;
-      const image=targetImages[item.imagePath];
+    for(const item of project.items)for(const imageId of getItemImageIds(item)){
+      const image=targetImages[imageId];
       if(!image||!image.ready||(image.ownerId&&image.ownerId!==item.id)||used.has(image.id))throw new StorageError('INVALID_IMAGE');
       used.add(image.id);
       const oldItem=state.project.items.find(x=>x.id===item.id);
@@ -180,12 +245,16 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
     next.pending={id:operationId,phase:'copy',targetProject:project,targetImages,targetRevision:state.projectRevision+1,copies,cleanup:[...new Set(cleanup)]};
     await writeState(snapshot,next);return resume();
   }
-  async function stageImage(input,{requiresPrivateAccess=false}={}){
-    const validated=sniffImage(input.bytes,input.mime);const id=`img_${randomUUID()}`;
+  async function compressValidated(input){
+    try{return await compressImage(input);}catch(error){if(error?.status===400)throw new StorageError('INVALID_IMAGE');throw error;}
+  }
+  async function stageImage(input,{requiresPrivateAccess=false,optimizationVersion}={}){
+    const checked=sniffImage(input.bytes,input.mime);
+    const validated=optimizationVersion===IMAGE_OPTIMIZATION_VERSION?checked:await compressValidated(checked);const id=`img_${randomUUID()}`;
     const encrypted=Buffer.from(JSON.stringify(encryptBytes(validated.bytes,key,`nas-storage:image:${id}:v1`)),'utf8');
     let snapshot=await resume();const state=clone(snapshot.state);
     if(Object.keys(state.images).length>=15000)throw new StorageError('TOO_LARGE');
-    const record={id,key:`Storage/.staging/${id}.enc`,mime:validated.mime,digest:digest(validated.bytes),encryptedSize:encrypted.length,ownerId:null,ready:false,createdAt:Date.now(),...(requiresPrivateAccess?{requiresPrivateAccess:true}:{})};
+    const record={id,key:`Storage/.staging/${id}.enc`,mime:validated.mime,digest:digest(validated.bytes),encryptedSize:encrypted.length,ownerId:null,ready:false,createdAt:Date.now(),optimizationVersion:IMAGE_OPTIMIZATION_VERSION,...(requiresPrivateAccess?{requiresPrivateAccess:true}:{})};
     state.images[id]=record;snapshot=await writeState(snapshot,state);
     await objects.put(record.key,encrypted,'application/octet-stream');await verifyPhoto(record,record.key);
     const next=clone(snapshot.state);next.images[id].ready=true;await writeState(snapshot,next);
@@ -202,8 +271,8 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       // Persist privacy classification so moving a row out of Look does not
       // unexpectedly publish it; a privacy-capable edit can clear the flag.
       const classify=createPrivacyClassifier(validated,rules);for(const item of validated.items)item.isPrivate=classify(item);
-      for(const item of validated.items){
-        const image=state.images[item.imagePath];
+      for(const item of validated.items)for(const imageId of getItemImageIds(item)){
+        const image=state.images[imageId];
         if(image?.requiresPrivateAccess&&!image.ownerId&&!all)throw new StorageError('FORBIDDEN');
       }
       return projection((await commitProject(snapshot,applyItemTimestamps(state.project,validated))).state,all);
@@ -215,7 +284,7 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       const source=state.project.items.find(item=>item.id===image.ownerId);
       const bytes=decodePhoto(image,await objects.get(image.key));
       // New image ID and encryption AAD keep deletion/moves independent of the source.
-      return stageImage({bytes,mime:image.mime},{requiresPrivateAccess:isPrivateItem(source,state.project,rules)});
+      return stageImage({bytes,mime:image.mime},{requiresPrivateAccess:isPrivateItem(source,state.project,rules),optimizationVersion:image.optimizationVersion});
     });},
     readImage(imageId,options={}){return readBounded(async()=>{
       // Image GETs inspect committed state only. Recovery and staged-upload
@@ -233,7 +302,7 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
           const cached=await cardCache.read(generation,async()=>{
             let result;
             try{result=await transformCard(original);}catch{/* Unsupported work falls back to the exact original. */}
-            const valid=result&&['image/jpeg','image/png'].includes(result.mime)&&result.bytes instanceof Uint8Array&&result.bytes.length>0&&result.bytes.length<=original.bytes.length;
+            const valid=result&&['image/jpeg','image/png','image/webp'].includes(result.mime)&&result.bytes instanceof Uint8Array&&result.bytes.length>0&&result.bytes.length<=original.bytes.length;
             const selected=valid?result:original;
             return Buffer.from(JSON.stringify({mime:selected.mime,envelope:encryptBytes(Buffer.from(selected.bytes),key,aad)}));
           });
@@ -249,7 +318,7 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
     }).catch(error=>{throw safeError(error);});},
     backup(){return run(async()=>{
       const {state}=await resume();const images={};
-      for(const item of state.project.items){if(!item.imagePath)continue;const record=state.images[item.imagePath];if(!record)throw new StorageError();images[item.imagePath]={bytes:decodePhoto(record,await objects.get(record.key)),mime:record.mime};}
+      for(const item of state.project.items)for(const imageId of getItemImageIds(item)){const record=state.images[imageId];if(!record||record.ownerId!==item.id||!record.ready)throw new StorageError();images[imageId]={bytes:decodePhoto(record,await objects.get(record.key)),mime:record.mime};}
       return {format:'nas-storage-backup',version:1,project:projection(state,true),images};
     });},
     importProject(project,options={}){return run(async()=>{
@@ -259,14 +328,16 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       if(snapshot.state.project.items.length||snapshot.state.project.categories.length||snapshot.state.project.locations.length||snapshot.state.projectRevision!==0)throw new StorageError('NOT_EMPTY');
       const validated=validateProject(project,{allowImagePaths:true});const inputs=new Map();
       const classify=createPrivacyClassifier(validated,rules);
-      for(const item of validated.items)if(item.imagePath){
-        if(!Object.hasOwn(options.images||{},item.imagePath))throw new StorageError('INVALID_IMAGE');
-        const raw=options.images[item.imagePath];inputs.set(item.imagePath,sniffImage(raw?.bytes,raw?.mime));
+      for(const item of validated.items)for(const imageId of getItemImageIds(item)){
+        if(!Object.hasOwn(options.images||{},imageId))throw new StorageError('INVALID_IMAGE');
+        const raw=options.images[imageId];inputs.set(imageId,sniffImage(raw?.bytes,raw?.mime));
       }
       // Validate all input before writing. Each bound item receives its own
       // image ID, even when the source project reused one local file.
       for(const item of validated.items){
-        if(item.imagePath){const uploaded=await stageImage(inputs.get(item.imagePath));item.imagePath=uploaded.imageId;}
+        const imageIds=[];
+        for(const sourceId of getItemImageIds(item)){const uploaded=await stageImage(inputs.get(sourceId));imageIds.push(uploaded.imageId);}
+        item.imagePath=imageIds[0]||'';if(Object.hasOwn(item,'imagePaths'))item.imagePaths=imageIds;
         item.isPrivate=classify(item);
       }
       snapshot=await resume();
@@ -275,8 +346,23 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       const canonical=validateProject(validated);
       return projection((await commitProject(snapshot,canonical)).state,true);
     });},
+    optimizeImages(options={}){return run(async()=>{
+      if(options.includePrivate!==true)throw new StorageError('FORBIDDEN');
+      const assertAuthorized=options.assertAuthorized||(()=>{});await assertAuthorized();
+      const snapshot=await resume({assertAuthorized});if(snapshot.optimizationStats)return snapshot.optimizationStats;const {state}=snapshot;
+      const bound=[];let skippedCount=0;
+      for(const item of state.project.items)for(const imageId of getItemImageIds(item)){
+        const image=authorizeImage(state,imageId,true);
+        if(image.optimizationVersion===IMAGE_OPTIMIZATION_VERSION)skippedCount++;else bound.push(imageId);
+      }
+      if(!bound.length)return {optimizedCount:0,skippedCount,beforeBytes:0,afterBytes:0,savedBytes:0};
+      await assertAuthorized();
+      const next=clone(state);next.pending={id:randomUUID(),phase:'optimize',transforms:bound.map(imageId=>({imageId,done:false})),targetImages:clone(state.images),targetRevision:state.projectRevision+1,cleanup:[...(state.pending?.phase==='cleanup'?state.pending.keys:[]),...bound.map(imageId=>state.images[imageId].key)],stats:{optimizedCount:0,skippedCount,beforeBytes:0,afterBytes:0}};
+      await writeState(snapshot,next);
+      return (await resume({assertAuthorized})).optimizationStats;
+    });},
     retryPending(){return run(async()=>{const {state}=await resume();return {ok:true,...(state.pending?.phase==='cleanup'?{cleanupPending:true}:{})};});},
     close(){return cardExecutor.close();}
   };
 }
-module.exports={createInventoryService};
+module.exports={createInventoryService,sniffImage};

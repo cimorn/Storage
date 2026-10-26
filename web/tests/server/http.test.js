@@ -100,7 +100,7 @@ describe('NAS HTTP adapter', () => {
     const objects = createMemoryObjectStore();
     const service = createInventoryService({ repository: createMemoryRepository(), objects, encryptionKey: randomBytes(32) });
     cleanup.push(() => service.close());
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=', 'base64');
+    const png = require('pngjs').PNG.sync.write({width:4,height:4,data:Buffer.alloc(64,255)});
     await service.importProject({ meta: {}, categories: [], locations: [], items: [{ id: 'hidden', name: '隐藏照片', tags: [], isPrivate: true, imagePath: 'source' }] }, { includePrivate: true, images: { source: { bytes: png, mime: 'image/png' } } });
     const imageId = (await service.getProject({ includePrivate: true })).items[0].imagePath;
     if (warm) await service.readImage(imageId, { includePrivate: true, ...(query ? { variant: 'card' } : {}) });
@@ -307,4 +307,17 @@ describe('NAS HTTP adapter', () => {
     const response = await request('/api/project', { headers: { Cookie: session.cookie } });
     expect(response.status).toBe(503); expect(await response.json()).toEqual({ code: 'SERVICE_UNAVAILABLE', error: '服务暂时不可用，请稍后重试' });
   });
+});
+
+it('requires a private CSRF capability for optimization and suppresses results after locking', async () => {
+  let release,entered;const started=new Promise(resolve=>{entered=resolve;});let calls=0;
+  const service=fixtureService();service.optimizeImages=async options=>{calls++;expect(options.includePrivate).toBe(true);await options.assertAuthorized();entered();await new Promise(resolve=>{release=resolve;});return {optimizedCount:2,skippedCount:0,beforeBytes:100,afterBytes:20,savedBytes:80};};
+  const {request,login}=await start({service});
+  expect((await request('/api/images/optimize',{method:'POST',headers:{Origin:origin}})).status).toBe(401);
+  const session=await login();expect((await request('/api/images/optimize',mutation(session))).status).toBe(403);
+  const {privacyToken}=await (await request('/api/privacy/open',mutation(session,{password:privacyPassword}))).json();const privateHeaders={'X-Storage-Privacy':privacyToken};
+  expect((await request('/api/images/optimize',{method:'POST',headers:{Cookie:session.cookie,Origin:origin,...privateHeaders}})).status).toBe(403);expect(calls).toBe(0);
+  const optimizing=request('/api/images/optimize',mutation(session,undefined,privateHeaders));await started;
+  await request('/api/privacy/close',mutation(session,undefined,privateHeaders));release();
+  const response=await optimizing;expect(response.status).toBe(403);expect(await response.json()).toMatchObject({code:'PRIVACY_REQUIRED'});expect(calls).toBe(1);
 });

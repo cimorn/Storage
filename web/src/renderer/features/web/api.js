@@ -1,3 +1,5 @@
+import { getItemImageIds } from '../../../../shared/item-images.mjs';
+
 const IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|jpg|webp|gif|bmp);base64,[a-z\d+/=\s]+$/i;
 
 export function createWebApi({ fetchImpl = window.fetch.bind(window), onUnauthorized } = {}) {
@@ -111,7 +113,7 @@ export function parseImportDocument(value) {
   }
   const images = value?.images || {};
   for (const item of project.items) {
-    if (item.imagePath && !IMAGE_DATA_URL.test(images[item.imagePath] || '')) {
+    if (getItemImageIds(item).some(id => !IMAGE_DATA_URL.test(images[id] || ''))) {
       throw new Error('迁移文件缺少物品图片，请使用迁移工具打包原项目图片后重新导入。');
     }
   }

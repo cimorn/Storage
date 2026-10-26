@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getItemVariants, MAX_ITEM_VARIANTS, withVariantSummary } from '../../../../shared/item-variants.mjs';
+import { getItemImageIds, MAX_ITEM_IMAGES, withImageSummary } from '../../../../shared/item-images.mjs';
 
 import {
   completeSmartTagInput,
@@ -16,6 +17,11 @@ import { createEmptyItemDraft } from './item-gallery-selectors';
 import { useImageAccess } from '../web/ImageAccessContext';
 import ItemVariantFields from './ItemVariantFields';
 import ItemInformationPage from './ItemInformationPage';
+import ItemImageEditor from './ItemImageEditor';
+
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+let pendingImageSequence = 0;
 
 let variantRowSequence = 0;
 function createVariantRow(row = { color: '', size: '', isPackaged: false }) {
@@ -37,7 +43,8 @@ function normalizeItem(item, categories, locations, mode = 'edit') {
       categoryId: item.categoryId || '',
       locationId: item.locationId || '',
       locationIds: getItemLocationIds(item).length ? getItemLocationIds(item) : [''],
-      imagePath: item.imagePath || '',
+      imagePaths: getItemImageIds(item),
+      imagePath: getItemImageIds(item)[0] || '',
       isPrivate: mode === 'copy' ? isItemPrivate(item, { categories, locations }) : Boolean(item.isPrivate),
       isPackaged: Boolean(item.isPackaged),
       tags: normalizeTagCodes(item.tags)
@@ -45,7 +52,7 @@ function normalizeItem(item, categories, locations, mode = 'edit') {
   }
 
   const empty = createEmptyItemDraft(categories, locations);
-  return { ...empty, variants: getItemVariants(empty).map(createVariantRow), locationIds: [empty.locationId || ''], isPrivate: false };
+  return { ...empty, imagePaths: [], imagePath: '', variants: getItemVariants(empty).map(createVariantRow), locationIds: [empty.locationId || ''], isPrivate: false };
 }
 
 function buildCategorySelection(categories, categoryId) {
@@ -86,11 +93,12 @@ export default function ItemEditorModal({
   const [tagInput, setTagInput] = useState('');
   const [imageFeedback, setImageFeedback] = useState({ type: '', message: '' });
   const [saving, setSaving] = useState(false);
-  const [pendingBrowserFile, setPendingBrowserFile] = useState(null);
+  const [pendingImages, setPendingImages] = useState([]);
+  const pendingImagesRef = useRef([]);
   const [activeTab, setActiveTab] = useState('edit');
   const tabsRef = useRef(null);
-  const stagedBrowserUploadRef = useRef(null);
-  const stagedImageCopyRef = useRef(null);
+  const stagedBrowserUploadRef = useRef(new Map());
+  const stagedImageCopyRef = useRef(new Map());
   const editorGenerationRef = useRef(0);
   const browserEditorSessionRef = useRef(null);
   const imageAccess = useImageAccess();
@@ -98,16 +106,24 @@ export default function ItemEditorModal({
 
   useLayoutEffect(() => {
     editorGenerationRef.current += 1;
+    replacePendingImages([]);
+    stagedBrowserUploadRef.current.clear();
+    stagedImageCopyRef.current.clear();
     return () => { editorGenerationRef.current += 1; };
   }, [open, mode, item?.id, imageAccess]);
+
+  useEffect(() => () => {
+    for (const row of pendingImagesRef.current) URL.revokeObjectURL(row.url);
+    pendingImagesRef.current = [];
+  }, []);
 
   useEffect(() => {
     if (!open) {
       browserEditorSessionRef.current = null;
       if (imageAccess) {
-        setPendingBrowserFile(null);
-        stagedBrowserUploadRef.current = null;
-        stagedImageCopyRef.current = null;
+        replacePendingImages([]);
+        stagedBrowserUploadRef.current.clear();
+        stagedImageCopyRef.current.clear();
       }
       return;
     }
@@ -128,9 +144,9 @@ export default function ItemEditorModal({
     setTagInput('');
     setImageFeedback({ type: '', message: '' });
     setSaving(false);
-    setPendingBrowserFile(null);
-    stagedBrowserUploadRef.current = null;
-    stagedImageCopyRef.current = null;
+    replacePendingImages([]);
+    stagedBrowserUploadRef.current.clear();
+    stagedImageCopyRef.current.clear();
   }, [open, item, categories, locations, mode, imageAccess]);
 
   const categorySelection = useMemo(
@@ -192,14 +208,57 @@ export default function ItemEditorModal({
     tabsRef.current?.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
   }
 
+  function replacePendingImages(nextImages) {
+    const retained = new Set(nextImages.map(row => row.key));
+    for (const row of pendingImagesRef.current) {
+      if (!retained.has(row.key)) {
+        URL.revokeObjectURL(row.url);
+        stagedBrowserUploadRef.current.delete(row.key);
+      }
+    }
+    pendingImagesRef.current = nextImages;
+    setPendingImages(nextImages);
+  }
+
   function handleBrowserFile(event) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (!file || saving || !imageAccess) return;
-    setPendingBrowserFile(file);
-    stagedBrowserUploadRef.current = null;
+    if (!files.length || saving || !imageAccess) return;
+    const failure = draft.imagePaths.length + pendingImages.length + files.length > MAX_ITEM_IMAGES
+      ? `每件物品最多选择 ${MAX_ITEM_IMAGES} 张图片`
+      : files.some(file => !IMAGE_TYPES.has(file.type))
+        ? '图片格式仅支持 PNG、JPEG、WebP、GIF 或 BMP'
+        : files.some(file => !file.size || file.size > MAX_IMAGE_BYTES)
+          ? '每张图片不能为空且不能超过 20MB'
+          : '';
+    if (failure) {
+      setImageFeedback({ type: 'error', message: failure });
+      return;
+    }
+    const added = [];
+    try {
+      for (const file of files) added.push({ key: ++pendingImageSequence, file, url: URL.createObjectURL(file) });
+    } catch {
+      for (const row of added) URL.revokeObjectURL(row.url);
+      setImageFeedback({ type: 'error', message: '图片预览失败，请重新选择' });
+      return;
+    }
+    replacePendingImages([...pendingImagesRef.current, ...added]);
     setDirtyDraft(true);
     setImageFeedback({ type: '', message: '' });
+  }
+
+  function removeSavedImage(imageId) {
+    if (saving) return;
+    const imagePaths = draft.imagePaths.filter(id => id !== imageId);
+    stagedImageCopyRef.current.delete(imageId);
+    updateDraft({ imagePaths, imagePath: imagePaths[0] || '' });
+  }
+
+  function removePendingImage(key) {
+    if (saving) return;
+    replacePendingImages(pendingImagesRef.current.filter(row => row.key !== key));
+    setDirtyDraft(true);
   }
 
   function updateDraftTags(tags) {
@@ -280,6 +339,7 @@ export default function ItemEditorModal({
 
     try {
       if (!draft.variants.length) throw new Error('原数量无法自动转换，请按实际件数添加规格后再保存');
+      if (mode === 'copy' && draft.imagePaths.length && !imageAccess) throw new Error('图片复制暂不可用，请重新打开物品后重试');
       const nextItem = withVariantSummary({
         ...(mode === 'copy' ? {} : item),
         ...draft,
@@ -295,34 +355,42 @@ export default function ItemEditorModal({
         if (!draft.categoryId || !categories.some((category) => category.id === draft.categoryId)) {
           throw new Error('请先选择分类');
         }
-        if (pendingBrowserFile) {
-          let staged = stagedBrowserUploadRef.current;
-          if (staged?.file !== pendingBrowserFile) {
-            const result = await imageAccess.upload(pendingBrowserFile);
+        const imagePaths = [];
+        for (const imageId of draft.imagePaths) {
+          if (mode !== 'copy') {
+            imagePaths.push(imageId);
+            continue;
+          }
+          let copiedId = stagedImageCopyRef.current.get(imageId);
+          if (!copiedId) {
+            const result = await imageAccess.copy(imageId);
+            if (!isCurrentSave()) return;
+            if (!result?.imageId || result.imageId === imageId || draft.imagePaths.includes(result.imageId)) throw new Error('图片复制失败，请重试');
+            copiedId = result.imageId;
+            stagedImageCopyRef.current.set(imageId, copiedId);
+          }
+          imagePaths.push(copiedId);
+        }
+        for (const row of pendingImages) {
+          let uploadedId = stagedBrowserUploadRef.current.get(row.key);
+          if (!uploadedId) {
+            const result = await imageAccess.upload(row.file);
             if (!isCurrentSave()) return;
             if (!result?.imageId) throw new Error('图片上传失败，请重试');
-            staged = { file: pendingBrowserFile, imageId: result.imageId };
-            stagedBrowserUploadRef.current = staged;
+            uploadedId = result.imageId;
+            stagedBrowserUploadRef.current.set(row.key, uploadedId);
           }
-          nextItem.imagePath = staged.imageId;
-        } else if (mode === 'copy' && item?.imagePath) {
-          let staged = stagedImageCopyRef.current;
-          if (staged?.sourceImageId !== item.imagePath) {
-            const result = await imageAccess.copy(item.imagePath);
-            if (!isCurrentSave()) return;
-            if (!result?.imageId || result.imageId === item.imagePath) throw new Error('图片复制失败，请重试');
-            staged = { sourceImageId: item.imagePath, imageId: result.imageId };
-            stagedImageCopyRef.current = staged;
-          }
-          nextItem.imagePath = staged.imageId;
+          imagePaths.push(uploadedId);
         }
+        Object.assign(nextItem, withImageSummary({ imagePaths }));
       }
       if (!isCurrentSave()) return;
       await onSave?.(nextItem);
       if (!isCurrentSave()) return;
-      setPendingBrowserFile(null);
-      stagedBrowserUploadRef.current = null;
-      stagedImageCopyRef.current = null;
+      setDraft(current => ({ ...current, imagePaths: nextItem.imagePaths, imagePath: nextItem.imagePath }));
+      replacePendingImages([]);
+      stagedBrowserUploadRef.current.clear();
+      stagedImageCopyRef.current.clear();
       setDirtyDraft(false);
     } catch (error) {
       if (isCurrentSave()) setImageFeedback({ type: 'error', message: error?.message || '物品保存失败' });
@@ -369,10 +437,8 @@ export default function ItemEditorModal({
           ) : null}
           <div className="item-editor-modal__edit-panel" role="tabpanel" id="item-editor-edit-panel" aria-labelledby="item-editor-edit-tab" hidden={activeTab !== 'edit'}>
           <section className="item-editor-modal__media">
-            <div className="web-item-image-selection" aria-label="物品图片选择状态">
-              <strong>{pendingBrowserFile ? pendingBrowserFile.name : draft.imagePath ? mode === 'copy' ? '沿用原物品图片' : '已保存图片' : '尚未选择图片'}</strong>
-              <span>{pendingBrowserFile ? '已选择，保存物品时上传' : mode === 'copy' && draft.imagePath ? '保存时复制图片，也可以重新选择' : '选择图片后，保存物品时上传'}</span>
-            </div>
+            <ItemImageEditor imageIds={draft.imagePaths} pendingImages={pendingImages} saving={saving}
+              onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} />
             <div className="item-editor-modal__media-actions">
               <div className="item-editor-modal__source-actions web-item-editor-options">
                 <button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()} disabled={saving}>
@@ -386,7 +452,7 @@ export default function ItemEditorModal({
                 </label> : null}
               </div>
               {canManagePrivacy && inheritedPrivate ? <p id="item-privacy-inheritance" className="privacy-inheritance-hint">所选分类或位置属于隐私区</p> : null}
-              <input hidden ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
+              <input hidden ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
             </div>
           </section>
 

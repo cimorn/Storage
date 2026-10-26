@@ -155,7 +155,7 @@ function createImageAccess(api, options) {
       const result = await api.uploadImage(dataUrl);
       if (!active) throw new Error('当前编辑已关闭');
       // The editor owns its selected File and staged ID for Save/retry. It
-      // displays no preview; saved cards read the bound image normally.
+      // keeps local previews until Save; bound previews use the shared cache.
       return result;
     },
     async copy(imageId) {

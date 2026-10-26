@@ -1,6 +1,7 @@
 'use strict';
 const {StorageError}=require('./errors');
 const {normalizeVariantRows,withVariantSummary}=require('../shared/item-variants.mjs');
+const {getItemImageIds}=require('../shared/item-images.mjs');
 const ITEM_FIELDS=['barcode','code','name','brand','quantity','specification','notes'];
 const META_FIELDS=['name','createdAt','updatedAt','appVersion'];
 const ID=/^[A-Za-z0-9_-]{1,128}$/;
@@ -60,8 +61,10 @@ function validateProject(input,{allowImagePaths=false}={}){
     for(const field of ['createdAt','updatedAt'])if(value[field]!=null)item[field]=text(value[field],64);
     if(value.isPrivate!=null&&typeof value.isPrivate!=='boolean')invalid();item.isPrivate=value.isPrivate===true;
     if(!Array.isArray(value.tags||[])||(value.tags||[]).length>100)invalid();item.tags=[...new Set((value.tags||[]).map(x=>text(x,128)).filter(Boolean))];
-    item.imagePath=text(value.imagePath,allowImagePaths?2048:128);
-    if(item.imagePath&&!allowImagePaths&&!/^img_[a-f0-9-]{36}$/.test(item.imagePath))throw new StorageError('INVALID_IMAGE');
+    let imageIds;try{imageIds=getItemImageIds(value);}catch{throw new StorageError('INVALID_IMAGE');}
+    if(imageIds.some(imageId=>imageId.length>(allowImagePaths?2048:128)||(!allowImagePaths&&!/^img_[a-f0-9-]{36}$/.test(imageId))))throw new StorageError('INVALID_IMAGE');
+    item.imagePath=imageIds[0]||'';
+    if(Object.hasOwn(value,'imagePaths'))item.imagePaths=imageIds;
     item.categoryPath=categoryLineage(item.categoryId).map(x=>x.name).join(' / ');
     item.locationPath=locationLineage(item.locationId).map(x=>x.name).join(' / ');
     if(Object.hasOwn(value,'locationIds'))item.locationPaths=assignedLocations.map(locationId=>locationLineage(locationId).map(x=>x.name).join(' / '));

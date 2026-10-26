@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
 const jpeg = require('jpeg-js');
 const { PNG } = require('pngjs');
+const sharp = require('sharp');
 const { createInventoryService } = require('../../server/inventory-service');
 const { createMemoryRepository } = require('../../server/repository');
 const { createMemoryObjectStore } = require('../../server/oss-store');
@@ -30,12 +31,13 @@ async function fixture(bytes, mime = 'image/jpeg', options = {}) {
   cleanup.push(() => service.close?.());
   await service.importProject({ meta: {}, categories: [], locations: [], items: [{ id: 'photo', name: '照片', tags: [], imagePath: 'old' }] }, { includePrivate: true, images: { old: { bytes, mime } } });
   const project = await service.getProject({ includePrivate: true });
-  return { service, objects, repository, id: project.items[0].imagePath, project };
+  const id = project.items[0].imagePath, stored = await service.readImage(id);
+  return { service, objects, repository, id, project, stored };
 }
 describe('gallery card image variants', () => {
   it.each(['expired-staging', 'pending-cleanup'].flatMap(recovery => ['card', 'original'].map(variant => ({ recovery, variant }))))('keeps image GET side effect free with %j and leaves cleanup to retryPending', async ({ recovery, variant }) => {
     const bytes = jpeg.encode(pixels(20, 10), 95).data;
-    const { service, id, repository, objects } = await fixture(bytes);
+    const { service, id, repository, objects, stored } = await fixture(bytes);
     await service.uploadImage({ bytes, mime: 'image/jpeg' });
     const orphanKey = objects.keys().find(key => key.includes('/.staging/'));
     expect(orphanKey).toBeTruthy();
@@ -60,38 +62,37 @@ describe('gallery card image variants', () => {
     await service.retryPending();
     expect(objects.keys()).not.toContain(orphanKey);
     expect((await repository.read()).revision).toBeGreaterThan(before.revision);
-    expect((await service.readImage(id)).bytes).toEqual(bytes);
+    expect(await service.readImage(id)).toEqual(stored);
   });
-  it('resizes real JPEG in a worker, applies orientation and preserves every original and backup byte', async () => {
+  it('resizes stored WebP in a worker after JPEG orientation and preserves stored and backup bytes', async () => {
     const original = oriented(jpeg.encode(pixels(), 95).data, 6);
-    const { service, id, project } = await fixture(original);
+    const { service, id, project, stored } = await fixture(original);
     const card = await service.readImage(id, { variant: 'card' });
-    const decoded = jpeg.decode(card.bytes);
+    const decoded = await sharp(card.bytes).metadata();
     expect([decoded.width, decoded.height]).toEqual([192, 384]);
-    expect(card.mime).toBe('image/jpeg'); expect(card.bytes.length).toBeLessThan(original.length);
-    expect((await service.readImage(id)).bytes).toEqual(original);
-    expect((await service.backup()).images[id].bytes).toEqual(original);
+    expect(card.mime).toBe('image/webp'); expect(card.bytes.length).toBeLessThan(stored.bytes.length);
+    expect(await service.readImage(id)).toEqual(stored);
+    expect((await service.backup()).images[id].bytes).toEqual(stored.bytes);
     expect((await service.getProject({ includePrivate: true })).revision).toBe(project.revision);
   }, 15000);
-  it('flattens PNG transparency against white without enlarging or returning more bytes', async () => {
+  it('preserves PNG transparency without enlarging or returning more bytes', async () => {
     const original = PNG.sync.write(pixels(500, 400, true));
-    const { service, id } = await fixture(original, 'image/png');
+    const { service, id, stored } = await fixture(original, 'image/png');
     const card = await service.readImage(id, { variant: 'card' });
-    const decoded = jpeg.decode(card.bytes);
-    expect([decoded.width, decoded.height]).toEqual([384, 307]);
-    expect(Array.from(decoded.data.subarray(0, 4))).toEqual([255, 255, 255, 255]);
-    expect(card.bytes.length).toBeLessThan(original.length);
+    const decoded = await sharp(card.bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([decoded.info.width, decoded.info.height]).toEqual([384, 307]);
+    expect(decoded.data[3]).toBe(0);
+    expect(card.bytes.length).toBeLessThan(stored.bytes.length);
     const small = jpeg.encode(pixels(20, 10), 95).data;
     const other = await fixture(small);
     const result = await other.service.readImage(other.id, { variant: 'card' });
-    expect(jpeg.decode(result.bytes).width).toBe(20); expect(result.bytes.length).toBeLessThanOrEqual(small.length);
+    expect((await sharp(result.bytes).metadata()).width).toBe(20); expect(result.bytes.length).toBeLessThanOrEqual(other.stored.bytes.length);
   });
-  it.each(['malformed', 'oversized', 'unsupported'])('falls back to exact original bytes for %s inputs', async (kind) => {
+  it.each(['malformed', 'oversized', 'unsupported'])('rejects %s uploads before making a card', async (kind) => {
     const bytes = kind === 'unsupported' ? Buffer.from('GIF89a123456789') : kind === 'malformed' ? Buffer.from([255,216,255,0,255,217]) : PNG.sync.write(pixels(1, 1));
     if (kind === 'oversized') bytes.writeUInt32BE(100000, 16);
     const mime = kind === 'unsupported' ? 'image/gif' : kind === 'malformed' ? 'image/jpeg' : 'image/png';
-    const { service, id } = await fixture(bytes, mime);
-    expect(await service.readImage(id, { variant: 'card' })).toEqual({ bytes, mime });
+    await expect(fixture(bytes, mime)).rejects.toMatchObject({ code: 'INVALID_IMAGE' });
   });
   it('deduplicates and expires variants independently of the original cache', async () => {
     let time = 0;
