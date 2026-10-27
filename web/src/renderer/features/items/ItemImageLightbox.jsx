@@ -6,7 +6,7 @@ export default function ItemImageLightbox({ image, onClose }) {
   const access = useImageAccess();
   const [full, setFull] = useState(null);
   const preview = useImagePreviewState(image.savedId || '');
-  const source = image.url || (full?.access === access && full.id === image.savedId ? full.url : '') || preview.url;
+  const source = image.url || (full?.access === access && full.id === image.savedId ? full.url : '') || image.previewUrl || preview.url;
   useEffect(() => {
     if (!image.savedId || !access) return undefined;
     const controller = new AbortController();
