@@ -37,6 +37,8 @@ Uploads become WebP images with a maximum long edge of 1920 pixels, without enla
 
 Items are sorted by latest update by default.
 
+The first visit downloads the interface. If a module fails to load after login, the page reloads once to fetch the current application; if it fails again, use Reload to try again.
+
 Click the app name at the top-left to unlock the private area. Locking or refreshing hides it again.
 
 ## Development
