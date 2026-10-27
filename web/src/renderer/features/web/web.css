@@ -40,8 +40,8 @@
 .item-variant-editor__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .item-variant-editor__heading strong { font-size: 0.85rem; }
 .item-variant-editor__heading-actions { display: flex; align-items: center; gap: 8px; }
-.item-variant-editor__row { display: grid; grid-template-columns: 40px minmax(64px, 120px) minmax(40px, 80px) 40px auto; justify-content: start; align-items: center; gap: 6px; width: 100%; min-width: 0; border-block: 1px solid transparent; }
-.item-variant-editor__row.is-sorting { grid-template-columns: minmax(0, 1fr); }
+.item-variant-editor__row { display: grid; grid-template-columns: 48px minmax(36px, 64px) minmax(40px, 80px) 40px max-content; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-width: 0; min-height: 60px; padding-block: 5px; border-block: 1px solid transparent; }
+.item-variant-editor__row.is-sorting { grid-template-columns: minmax(0, 1fr); min-height: 0; padding-block: 0; }
 .web-item-editor-backdrop .item-variant-editor__sort-handle { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; height: 38px; min-height: 38px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; color: var(--text); font-size: 0.85rem; cursor: grab; touch-action: none; user-select: none; }
 .item-variant-editor__sort-handle > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-variant-editor__sort-handle:active { cursor: grabbing; }
@@ -55,7 +55,8 @@
 .variant-image-thumbnail svg { width: 21px; height: 21px; }
 .web-item-editor-backdrop .variant-image-open { display: grid; place-content: center; width: 36px; height: 36px; min-height: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: zoom-in; }
 .item-variant-editor__photo { position: relative; min-width: 0; }
-.item-variant-editor__empty-photo { display: block; width: 30px; height: 30px; border: 1px dashed var(--border); border-radius: 4px; }
+.item-variant-editor__photo .variant-image-thumbnail, .web-item-editor-backdrop .item-variant-editor__photo .variant-image-open { width: 48px; height: 48px; }
+.item-variant-editor__empty-photo { display: block; width: 48px; height: 48px; border: 1px dashed var(--border); border-radius: 4px; }
 .web-item-editor-backdrop .item-variant-editor__clear-image { position: absolute; top: -3px; right: 0; display: grid; place-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 60%); color: #fff; font-size: 12px; }
 .web-item-editor-backdrop .item-variant-editor__row > input { width: 100%; min-width: 0; height: 28px; min-height: 28px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: #fff; font-size: 0.75rem; }
 .web-item-editor-backdrop .item-variant-editor__row > input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset: 1px; border-color: var(--accent); }
@@ -85,7 +86,7 @@
 .item-image-lightbox__dialog > img { display: block; width: 100%; height: 100%; min-height: 0; min-width: 0; object-fit: contain; }
 .item-image-lightbox .item-image-lightbox__close { position: fixed; top: max(16px, env(safe-area-inset-top)); right: 16px; display: grid; place-content: center; width: 36px; height: 36px; min-height: 36px; padding: 0; border: 1px solid rgb(255 255 255 / 40%); border-radius: 50%; background: rgb(0 0 0 / 40%); color: white; font-size: 26px; }
 @media (max-width: 400px) {
-  .item-variant-editor__row { grid-template-columns: 32px minmax(36px, 76px) minmax(28px, 54px) 30px auto; gap: 4px; }
+  .item-variant-editor__row { grid-template-columns: 48px minmax(28px, 48px) minmax(28px, 54px) 30px max-content; gap: 4px; }
   .web-item-editor-backdrop .item-variant-editor__row > input { padding-inline: 4px; }
   .web-item-editor-backdrop .item-variant-editor__controls > button, .item-variant-editor__packaging { width: 28px; }
   .web-item-editor-backdrop .variant-image-open { width: 30px; }
