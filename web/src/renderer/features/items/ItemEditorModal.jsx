@@ -19,6 +19,7 @@ import { useImageAccess } from '../web/ImageAccessContext';
 import ItemVariantFields from './ItemVariantFields';
 import ItemInformationPage from './ItemInformationPage';
 import ItemImageEditor from './ItemImageEditor';
+import ItemImageLightbox from './ItemImageLightbox';
 
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -104,9 +105,13 @@ export default function ItemEditorModal({
   const browserEditorSessionRef = useRef(null);
   const imageAccess = useImageAccess();
   const fileInputRef = useRef(null);
+  const uploadTargetRef = useRef(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   useLayoutEffect(() => {
     editorGenerationRef.current += 1;
+    uploadTargetRef.current = null;
+    setPreviewImage(null);
     replacePendingImages([]);
     stagedBrowserUploadRef.current.clear();
     stagedImageCopyRef.current.clear();
@@ -162,12 +167,16 @@ export default function ItemEditorModal({
   const level1Options = useMemo(() => getChildEntries(locations, null), [locations]);
   const assignedLocationIds = [...new Set(draft.locationIds.filter(Boolean))];
   const availableImageOptions = [
-    ...draft.imagePaths.map((id, index) => ({ id, savedId: id, label: `图片${index + 1}` })),
-    ...pendingImages.map(row => ({ id: `pending:${row.key}`, url: row.url, label: row.file.name }))
+    ...draft.imagePaths.map((id, index) => ({ id, savedId: id, label: `图片${index + 1}`, alt: `已保存图片${index + 1}` })),
+    ...pendingImages.map((row, index) => ({ id: `pending:${row.key}`, url: row.url, label: row.file.name, alt: `待上传图片${index + 1}：${row.file.name}` }))
   ];
   const imageOptionById = new Map(availableImageOptions.map(option => [option.id, option]));
   const imageOrder = orderImagesByVariants(availableImageOptions.map(option => option.id), draft.variants);
   const imageOptions = imageOrder.map(id => imageOptionById.get(id));
+  const assignedImages = new Set(draft.variants.map(row => row.imageId).filter(Boolean));
+  const unassignedSavedImages = draft.imagePaths.filter(id => !assignedImages.has(id));
+  const unassignedPendingImages = pendingImages.filter(row => !assignedImages.has(`pending:${row.key}`));
+  const visiblePreview = previewImage?.access === imageAccess && previewImage.generation === editorGenerationRef.current ? previewImage.image : null;
   const inheritedPrivate = isItemPrivate(
     { ...draft, locationIds: assignedLocationIds, isPrivate: false },
     { categories, locations }
@@ -196,14 +205,15 @@ export default function ItemEditorModal({
 
   function addVariant() {
     if (draft.variants.length >= MAX_ITEM_VARIANTS) return;
-    const used = new Set(draft.variants.map(row => row.imageId));
-    const imageId = imageOptions.find(option => !used.has(option.id))?.id || '';
-    updateDraft({ variants: [...draft.variants, createVariantRow({ color: '', size: '', isPackaged: false, quantity: '', imageId })] });
+    updateDraft({ variants: [...draft.variants, createVariantRow({ color: '', size: '', isPackaged: false, quantity: '', imageId: '' })] });
   }
 
   function removeVariant(rowKey) {
     if (draft.variants.length <= 1) return;
-    updateDraft({ variants: draft.variants.filter(row => row.rowKey !== rowKey) });
+    const imageId = draft.variants.find(row => row.rowKey === rowKey)?.imageId;
+    if (imageId) removeImage(imageId);
+    setDraft(current => ({ ...current, variants: current.variants.filter(row => row.rowKey !== rowKey) }));
+    setDirtyDraft(true);
   }
 
   function reorderVariant(sourceKey, targetKey, position) {
@@ -218,14 +228,15 @@ export default function ItemEditorModal({
   }
 
   function handleTabKeyDown(event) {
-    const index = activeTab === 'edit' ? 0 : 1;
+    const tabs = ['edit', 'information', 'tags'];
+    const index = tabs.indexOf(activeTab);
     let nextIndex;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') nextIndex = 1 - index;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') nextIndex = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     else if (event.key === 'Home') nextIndex = 0;
-    else if (event.key === 'End') nextIndex = 1;
+    else if (event.key === 'End') nextIndex = tabs.length - 1;
     else return;
     event.preventDefault();
-    setActiveTab(nextIndex === 0 ? 'edit' : 'information');
+    setActiveTab(tabs[nextIndex]);
     tabsRef.current?.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
   }
 
@@ -245,7 +256,11 @@ export default function ItemEditorModal({
     const files = Array.from(event.target.files || []);
     event.target.value = '';
     if (!files.length || saving || !imageAccess) return;
-    const failure = draft.imagePaths.length + pendingImages.length + files.length > MAX_ITEM_IMAGES
+    const targetKey = uploadTargetRef.current;
+    uploadTargetRef.current = null;
+    const target = draft.variants.find(row => row.rowKey === targetKey);
+    if (!target) return;
+    const failure = files.length !== 1 ? '每条规格请选择一张图片' : draft.imagePaths.length + pendingImages.length + files.length - (target.imageId ? 1 : 0) > MAX_ITEM_IMAGES
       ? `每件物品最多选择 ${MAX_ITEM_IMAGES} 张图片`
       : files.some(file => !IMAGE_TYPES.has(file.type))
         ? '图片格式仅支持 PNG、JPEG、WebP、GIF 或 BMP'
@@ -264,11 +279,27 @@ export default function ItemEditorModal({
       setImageFeedback({ type: 'error', message: '图片预览失败，请重新选择' });
       return;
     }
+    if (target.imageId) removeImage(target.imageId);
     replacePendingImages([...pendingImagesRef.current, ...added]);
-    const available = added.map(row => `pending:${row.key}`);
-    setDraft(current => ({ ...current, variants: current.variants.map(row => !row.imageId && available.length ? { ...row, imageId: available.shift() } : row) }));
+    setDraft(current => ({ ...current, variants: current.variants.map(row => row.rowKey === targetKey ? { ...row, imageId: `pending:${added[0].key}` } : row) }));
     setDirtyDraft(true);
     setImageFeedback({ type: '', message: '' });
+  }
+
+  function chooseVariantImage(rowKey) {
+    if (saving) return;
+    uploadTargetRef.current = rowKey;
+    fileInputRef.current?.click();
+  }
+
+  function removeImage(imageId) {
+    setPreviewImage(null);
+    if (imageId.startsWith('pending:')) removePendingImage(Number(imageId.slice(8)));
+    else removeSavedImage(imageId);
+  }
+
+  function previewPhoto(image) {
+    setPreviewImage({ image, access: imageAccess, generation: editorGenerationRef.current });
   }
 
   function removeSavedImage(imageId) {
@@ -445,6 +476,7 @@ export default function ItemEditorModal({
         aria-modal="true"
         aria-labelledby="item-editor-title"
         onKeyDown={handleDialogKeyDown}
+        inert={visiblePreview ? true : undefined}
       >
         <div className="dialog-header item-editor-modal__header">
           <div>
@@ -459,9 +491,9 @@ export default function ItemEditorModal({
           <div className="item-editor-modal__tabs" role="tablist" aria-label="物品页面" ref={tabsRef} onKeyDown={handleTabKeyDown}>
             <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑页</button>
             <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息页</button>
+            <button type="button" role="tab" id="item-editor-tags-tab" aria-controls="item-editor-tags-panel" aria-selected={activeTab === 'tags'} tabIndex={activeTab === 'tags' ? 0 : -1} onClick={() => setActiveTab('tags')}>标签</button>
           </div>
-          <button className="secondary-button item-editor-modal__choose-images" type="button" onClick={() => fileInputRef.current?.click()} disabled={saving}>选择图片</button>
-          <input hidden ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
+          <input hidden ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
         </div>
 
         <div className="item-editor-modal__body">
@@ -472,8 +504,8 @@ export default function ItemEditorModal({
           ) : null}
           <div className="item-editor-modal__edit-panel" role="tabpanel" id="item-editor-edit-panel" aria-labelledby="item-editor-edit-tab" hidden={activeTab !== 'edit'}>
           <section className="item-editor-modal__media">
-            <ItemImageEditor imageIds={draft.imagePaths} pendingImages={pendingImages} imageOrder={imageOrder} saving={saving}
-              onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} />
+            {unassignedSavedImages.length || unassignedPendingImages.length ? <ItemImageEditor imageIds={unassignedSavedImages} pendingImages={unassignedPendingImages} imageOrder={imageOrder} saving={saving}
+              onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} onPreview={previewPhoto} /> : null}
             {canManagePrivacy ? <div className="item-editor-modal__media-actions">
               <label className="web-item-option-control">
                 <input type="checkbox" checked={draft.isPrivate || inheritedPrivate} disabled={saving || inheritedPrivate}
@@ -486,21 +518,21 @@ export default function ItemEditorModal({
           </section>
 
           <fieldset className="item-editor-modal__form" disabled={saving}>
-            <div className="form-row">
+            <div className="form-row form-row--2 item-editor-modal__paired-row">
               <label className="field">
                 <span>名称</span>
                 <input autoFocus value={draft.name} onChange={(event) => updateDraft({ name: event.target.value })} />
               </label>
-            </div>
-
-            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS} onReorder={reorderVariant}
-              onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} />
-
-            <div className="form-row form-row--2 item-editor-modal__paired-row">
               <label className="field">
                 <span>品牌</span>
                 <input value={draft.brand} onChange={(event) => updateDraft({ brand: event.target.value })} />
               </label>
+            </div>
+
+            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS} onReorder={reorderVariant}
+              onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} onUpload={chooseVariantImage} onRemoveImage={removeImage} onPreview={previewPhoto} />
+
+            <div className="form-row">
               <label className="field">
                 <span>款式</span>
                 <input placeholder="印花 镂空" value={draft.specification} onChange={(event) => updateDraft({ specification: event.target.value })} onBlur={(event) => { const specification = normalizeItemDetailInput(event.target.value); if (specification !== draft.specification) updateDraft({ specification }); }} />
@@ -544,25 +576,25 @@ export default function ItemEditorModal({
                 return <div className="item-location-editor__row" role="group" aria-label={`存放位置 ${index + 1}`} key={index}>
                   <div className="form-row form-row--3 item-location-editor__selects">
                     <label className="field">
-                      <span>一级位置</span>
-                      <select value={selection.level1Id} onChange={event => updateLocation(index, event.target.value)}>
-                        <option value="">未选择</option>
+                      <span>一级</span>
+                      <select aria-label="一级位置" value={selection.level1Id} onChange={event => updateLocation(index, event.target.value)}>
+                        <option value="">未选</option>
                         {level1Options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
                       </select>
                     </label>
                     <label className="field">
-                      <span>二级位置</span>
-                      <select value={selection.level2Id} disabled={!level2Options.length}
+                      <span>二级</span>
+                      <select aria-label="二级位置" value={selection.level2Id} disabled={!level2Options.length}
                         onChange={event => updateLocation(index, event.target.value || selection.level1Id)}>
-                        <option value="">{level2Options.length ? '未选择' : '无二级位置'}</option>
+                        <option value="">{level2Options.length ? '未选' : '无'}</option>
                         {level2Options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
                       </select>
                     </label>
                     <label className="field">
-                      <span>三级位置</span>
-                      <select value={selection.level3Id} disabled={!level3Options.length}
+                      <span>三级</span>
+                      <select aria-label="三级位置" value={selection.level3Id} disabled={!level3Options.length}
                         onChange={event => updateLocation(index, event.target.value || selection.level2Id || selection.level1Id)}>
-                        <option value="">{level3Options.length ? '未选择' : '无三级位置'}</option>
+                        <option value="">{level3Options.length ? '未选' : '无'}</option>
                         {level3Options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
                       </select>
                     </label>
@@ -578,6 +610,10 @@ export default function ItemEditorModal({
               })}
             </section>
 
+          </fieldset>
+          </div>
+          <section role="tabpanel" id="item-editor-tags-panel" aria-labelledby="item-editor-tags-tab" hidden={activeTab !== 'tags'}>
+            <fieldset className="item-editor-modal__form" disabled={saving}>
             <section className="tag-editor-panel tag-editor-panel--compact" aria-label="物品标签">
               <div className="tag-editor-panel__header">
                 <span>标签</span>
@@ -649,9 +685,9 @@ export default function ItemEditorModal({
             </section>
 
           </fieldset>
-          </div>
+          </section>
           <section role="tabpanel" id="item-editor-information-panel" aria-labelledby="item-editor-information-tab" hidden={activeTab !== 'information'}>
-            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} imageOptions={imageOptions} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
+            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} imageOptions={imageOptions} onPreview={previewPhoto} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
           </section>
         </div>
 
@@ -683,6 +719,7 @@ export default function ItemEditorModal({
           </div>
         </div>
       </div>
+      {visiblePreview ? <ItemImageLightbox image={visiblePreview} onClose={() => setPreviewImage(null)} /> : null}
     </div>
   );
 }

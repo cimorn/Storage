@@ -1,3 +1,4 @@
+import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { StrictMode } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -335,7 +336,7 @@ describe('password gated browser inventory', () => {
     await screen.findByRole('button', { name: '隐藏物品' });
     await user.click(await screen.findByRole('button', { name: '普通物品' }));
     const dialog = screen.getByRole('dialog');
-    await user.upload(within(dialog).getByLabelText('从相册选择图片'), new File(['photo'], 'photo.png', { type: 'image/png' }));
+    await uploadVariantPhotos(user, new File(['photo'], 'photo.png', { type: 'image/png' }));
     expect(fetchImpl.mock.calls.some(([url]) => url === '/api/images')).toBe(false);
     await user.click(within(dialog).getByLabelText('隐私区'));
     await user.click(within(dialog).getByRole('button', { name: '保存', exact: true }));

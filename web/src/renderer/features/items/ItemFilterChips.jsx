@@ -92,7 +92,7 @@ function LocationSelectGroup({ levels, selection, onChange }) {
           disabled={!selection.level1Id || !levels.level2.length}
         >
           <option value="" disabled>
-            二级位置
+            二级
           </option>
           {levels.level2.length ? <option value={allOptionValue}>全部</option> : null}
           {levels.level2.map((option) => (
@@ -111,7 +111,7 @@ function LocationSelectGroup({ levels, selection, onChange }) {
           disabled={!selection.level2Id || !levels.level3.length}
         >
           <option value="" disabled>
-            三级位置
+            三级
           </option>
           {levels.level3.length ? <option value={allOptionValue}>全部</option> : null}
           {levels.level3.map((option) => (

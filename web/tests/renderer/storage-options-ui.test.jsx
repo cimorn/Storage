@@ -72,9 +72,9 @@ describe('compact NAS item controls', () => {
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
     expect(container.querySelector('input[type="file"]')).not.toHaveAttribute('capture');
     expect(screen.getByRole('checkbox', { name: '隐私区' })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: '选择图片' }).closest('.item-editor-modal__toolbar')).toContainElement(screen.getByRole('tablist', { name: '物品页面' }));
+    expect(screen.getByRole('tab', { name: '标签', exact: true }).closest('.item-editor-modal__toolbar')).toContainElement(screen.getByRole('tablist', { name: '物品页面' }));
     await user.click(screen.getByLabelText('包装1'));
-    expect(container.querySelector('.item-editor-modal__form').lastElementChild).toHaveAttribute('aria-label', '物品标签');
+    expect(screen.getByRole('tab', { name: '标签', exact: true })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ isPackaged: true, isPrivate: false }));
   });
@@ -164,8 +164,8 @@ describe('compact NAS item controls', () => {
     expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
     const panel = screen.getByRole('tabpanel', { name: '信息页' });
     const table = within(panel).getByRole('table');
-    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['图片', '颜色', '尺码', '数量', '有无包装']);
-    expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['—奶油白S1有包装', '———1无包装']);
+    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['图片', '颜色', '尺码', '数量', '包装']);
+    expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['—奶油白S1有', '———1无']);
     expect(within(panel).queryByRole('textbox')).not.toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.keyboard('{ArrowLeft}');
