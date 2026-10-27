@@ -1,7 +1,7 @@
 import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import ItemEditorModal from '../../src/renderer/features/items/ItemEditorModal';
 import ItemGalleryCard from '../../src/renderer/features/items/ItemGalleryCard';
 import { buildItemCardView } from '../../src/renderer/features/items/item-gallery-selectors';
@@ -15,6 +15,7 @@ function setup({ item = base, mode = 'edit', card = false } = {}) {
   const view = render(<ImageAccessProvider api={api}>{card ? <ItemGalleryCard item={buildItemCardView(item)} /> : <ItemEditorModal open mode={mode} item={item} categories={[{ id: 'cat', name: '服装', level: 1 }]} onSave={onSave} />}</ImageAccessProvider>);
   return { ...view, api, onSave, user: userEvent.setup() };
 }
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe('variant photo and quantity editor', () => {
   it('keeps a separate quantity input for every specification and defaults a cleared value to one', async () => {
@@ -82,7 +83,7 @@ describe('variant photo and quantity editor', () => {
   });
   it('shows a quantity column in the information table', async () => {
     const { user } = setup();
-    await user.click(screen.getByRole('tab', { name: '信息页', exact: true }));
+    await user.click(screen.getByRole('tab', { name: '信息', exact: true }));
     const table = screen.getByRole('table', { name: '物品规格信息' });
     expect(within(table).getByRole('columnheader', { name: '图片', exact: true })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: '数量', exact: true })).toBeInTheDocument();

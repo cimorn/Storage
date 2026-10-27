@@ -1,7 +1,7 @@
 import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import ItemEditorModal from '../../src/renderer/features/items/ItemEditorModal';
 import ItemsGalleryPage from '../../src/renderer/features/items/ItemsGalleryPage';
@@ -54,6 +54,7 @@ async function selectPhoto(user, name = '相册照片.png') {
   return file;
 }
 
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('NAS editor deferred image upload', () => {
@@ -169,12 +170,12 @@ describe('NAS editor deferred image upload', () => {
     const { api, onSave, rerenderEditor } = setup();
     await user.type(screen.getByLabelText('颜色1'), '蓝色');
     await selectPhoto(user);
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('tab', { name: '信息' }));
     rerenderEditor({ item: { ...item }, categories: categories.map(category => ({ ...category })), locations: [] });
-    expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '信息' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
     expect(api.uploadImage).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    await user.click(screen.getByRole('tab', { name: '编辑' }));
     expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
@@ -187,7 +188,7 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.queryByRole('button', { name: '选择图片', exact: true })).not.toBeInTheDocument();
     await selectPhoto(user);
     expect(screen.getByRole('button', { name: '上传规格1图片' }).closest('.item-variant-editor__row')).toContainElement(screen.getByRole('img'));
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('tab', { name: '信息' }));
     expect(screen.getByRole('button', { name: '放大规格1图片' })).toBeVisible();
     expect(api.uploadImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
@@ -199,13 +200,13 @@ describe('NAS editor deferred image upload', () => {
     const { onSave } = setup({ api: { uploadImage: vi.fn().mockRejectedValue(new Error('上传断开')) } });
     await user.type(screen.getByLabelText('颜色1'), '蓝色');
     await selectPhoto(user);
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('tab', { name: '信息' }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByRole('alert')).toBeVisible();
     expect(screen.getByRole('alert')).toHaveTextContent('上传断开');
     expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    await user.click(screen.getByRole('tab', { name: '编辑' }));
     expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
   });

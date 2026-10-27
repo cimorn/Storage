@@ -38,6 +38,7 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   access.current = { copy: vi.fn().mockResolvedValue({ imageId: 'independent-image' }), upload: vi.fn().mockResolvedValue({ imageId: 'replacement-image' }) };
 });
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('copy a saved item into a new draft', () => {
