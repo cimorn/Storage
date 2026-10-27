@@ -81,7 +81,7 @@ describe('structured item variants in the renderer', () => {
     const item = fixture().items[0];
     const card = buildItemCardView(item);
     expect(card.note).toContain('白色'); expect(card.note).toContain('红色');
-    expect(card.metaLine).toBe('印花·镂空 · 2');
+    expect(card.metaLine).toBe('印花·镂空');
     const view = render(<ItemGalleryCard item={card} />);
     expect(screen.getByRole('img', { name: '有包装' })).toBeInTheDocument();
     view.rerender(<ItemGalleryCard item={buildItemCardView({ ...item, variants: rows().map(row => ({ ...row, isPackaged: false })) })} />);

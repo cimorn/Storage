@@ -1053,14 +1053,30 @@ button:not(:disabled):hover {
 
 .item-gallery-card__image-count {
   position: absolute;
-  right: 7px;
-  bottom: 7px;
-  padding: 2px 7px;
+  right: 5px;
+  bottom: 5px;
+  padding: 1px 4px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.5);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 9px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.item-gallery-card__quantity {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.5;
+  text-align: center;
   pointer-events: none;
 }
 

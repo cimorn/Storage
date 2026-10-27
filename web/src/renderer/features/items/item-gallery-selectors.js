@@ -12,8 +12,7 @@ export function formatCompactPath(path) {
 
 export function buildItemCardView(item) {
   const note = formatItemVariants(item);
-  const quantity = toText(getItemQuantity(item));
-  const metaLine = [item.brand, normalizeItemDetail(item.specification), quantity === '1' ? '' : quantity].map(toText).filter(Boolean).join(' · ');
+  const metaLine = [item.brand, normalizeItemDetail(item.specification)].map(toText).filter(Boolean).join(' · ');
   const locationLine = [...new Set((item.locationPaths || [item.locationPath]).map(formatCompactPath).filter(Boolean))].join('；') || '未设置位置';
 
   return {

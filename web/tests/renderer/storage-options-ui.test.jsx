@@ -43,7 +43,7 @@ describe('compact NAS item controls', () => {
     await user.type(style, '印花　镂空');
     expect(style).toHaveValue('印花　镂空');
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '保存', exact: true })));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '白色', size: 'S', isPackaged: false }], specification: '印花 镂空' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '白色', size: 'S', isPackaged: false, quantity: 1, imageId: '' }], specification: '印花 镂空' }));
   });
 
   it('opens recognizable legacy details as a row and derives quantity from rows', async () => {
@@ -62,7 +62,7 @@ describe('compact NAS item controls', () => {
     await user.clear(screen.getByLabelText('款式'));
     await user.type(screen.getByLabelText('款式'), '纯色');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '黑色', size: 'M', isPackaged: false }], specification: '纯色' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ variants: [{ color: '黑色', size: 'M', isPackaged: false, quantity: 1, imageId: '' }], specification: '纯色' }));
     expect(String(onSave.mock.calls[0][0].quantity)).toBe('1');
   });
 
@@ -149,7 +149,7 @@ describe('compact NAS item controls', () => {
     expect(screen.getByText('共2件')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      variants: [{ color: '白色', size: 'S', isPackaged: false }, { color: '蓝色', size: 'L', isPackaged: true }], isPackaged: true
+      variants: [{ color: '白色', size: 'S', isPackaged: false, quantity: 1, imageId: '' }, { color: '蓝色', size: 'L', isPackaged: true, quantity: 1, imageId: '' }], isPackaged: true
     }));
     expect(String(onSave.mock.calls[0][0].quantity)).toBe('2');
   });
@@ -164,8 +164,8 @@ describe('compact NAS item controls', () => {
     expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
     const panel = screen.getByRole('tabpanel', { name: '信息页' });
     const table = within(panel).getByRole('table');
-    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['颜色', '尺码', '有无包装']);
-    expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['奶油白S有包装', '——无包装']);
+    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['图片', '颜色', '尺码', '数量', '有无包装']);
+    expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['—奶油白S1有包装', '———1无包装']);
     expect(within(panel).queryByRole('textbox')).not.toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.keyboard('{ArrowLeft}');
@@ -184,7 +184,7 @@ describe('compact NAS item controls', () => {
     expect(screen.getByText('共2件')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '', variants: [
-      { color: '', size: '', isPackaged: false }, { color: '', size: '', isPackaged: false }
+      { color: '', size: '', isPackaged: false, quantity: 1, imageId: '' }, { color: '', size: '', isPackaged: false, quantity: 1, imageId: '' }
     ] }));
   });
 
@@ -199,7 +199,7 @@ describe('compact NAS item controls', () => {
     await user.click(screen.getByRole('button', { name: '添加颜色' }));
     expect(screen.getByText('共1件')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '', variants: [{ color: '', size: '', isPackaged: false }] }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '', variants: [{ color: '', size: '', isPackaged: false, quantity: 1, imageId: '' }] }));
     expect(String(onSave.mock.calls[0][0].quantity)).toBe('1');
   });
 

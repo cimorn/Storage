@@ -1,4 +1,18 @@
+import { getItemImageIds } from './item-images.mjs';
+
 export const MAX_ITEM_VARIANTS = 1000;
+export const MAX_VARIANT_QUANTITY = 1000000;
+
+export function getVariantQuantity(row = {}) {
+  if (!Object.hasOwn(row, 'quantity')) return 1;
+  const value = row.quantity;
+  if (typeof value !== 'number' && typeof value !== 'string') throw new TypeError('规格数量须为正整数');
+  if (typeof value === 'string' && value.trim() === '') return 1;
+  if (typeof value === 'string' && (value.length > 16 || !/^\d+$/u.test(value.trim()))) throw new TypeError('规格数量须为正整数');
+  const quantity = Number(value);
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_VARIANT_QUANTITY) throw new TypeError(`规格数量须为 1 至 ${MAX_VARIANT_QUANTITY} 的整数`);
+  return quantity;
+}
 
 const text = value => String(value ?? '').trim();
 const detailText = value => text(value).replace(/\s+/gu, ' ');
@@ -13,13 +27,22 @@ const LEGACY_COUNT = /^(\d+)\s*(?:个|件|台|套|双|条|只|本|瓶|盒|包|�
 export function normalizeVariantRows(rows) {
   const invalid = () => { throw new TypeError('物品规格数据格式不正确'); };
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_ITEM_VARIANTS) invalid();
+  const assignedImages = new Set();
   return Array.from(rows, row => {
     if (!row || typeof row !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(row))) invalid();
     for (const key of ['color', 'size']) {
       if (typeof row[key] !== 'string' || row[key].length > 128 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(row[key])) invalid();
     }
     if (typeof row.isPackaged !== 'boolean') invalid();
-    return { color: detailText(row.color), size: detailText(row.size), isPackaged: row.isPackaged };
+    const result = { color: detailText(row.color), size: detailText(row.size), isPackaged: row.isPackaged };
+    if (Object.hasOwn(row, 'quantity')) result.quantity = getVariantQuantity(row);
+    if (Object.hasOwn(row, 'imageId')) {
+      if (typeof row.imageId !== 'string' || row.imageId.length > 2048 || /[\u0000-\u001f\u007f]/u.test(row.imageId)) invalid();
+      result.imageId = row.imageId.trim();
+      if (result.imageId && assignedImages.has(result.imageId)) throw new TypeError('每张图片只能对应一条规格');
+      if (result.imageId) assignedImages.add(result.imageId);
+    }
+    return result;
   });
 }
 
@@ -35,7 +58,12 @@ export function parseLegacyVariant(value) {
 }
 
 export function getItemVariants(item = {}) {
-  if (Object.hasOwn(item, 'variants')) return normalizeVariantRows(item.variants);
+  if (Object.hasOwn(item, 'variants')) {
+    const rows = normalizeVariantRows(item.variants);
+    const images = getItemImageIds(item);
+    if (rows.length === 1 && images.length === 1 && !Object.hasOwn(rows[0], 'imageId')) rows[0].imageId = images[0];
+    return rows;
+  }
   const quantity = text(item.quantity);
   const match = quantity ? quantity.match(LEGACY_COUNT) : null;
   const count = quantity ? match ? Number(match[1]) : NaN : 1;
@@ -43,7 +71,10 @@ export function getItemVariants(item = {}) {
   // path. Never invent one item or truncate a count that exceeds the bound.
   if (!Number.isSafeInteger(count) || count < 1 || count > MAX_ITEM_VARIANTS) return [];
   const details = parseLegacyVariant(item.notes) || { color: '', size: '' };
-  return Array.from({ length: count }, () => ({ ...details, isPackaged: item.isPackaged === true }));
+  const rows = Array.from({ length: count }, () => ({ ...details, isPackaged: item.isPackaged === true }));
+  const images = getItemImageIds(item);
+  if (rows.length === 1 && images.length === 1) rows[0].imageId = images[0];
+  return rows;
 }
 
 export function hasItemPackaging(item = {}) {
@@ -53,7 +84,7 @@ export function hasItemPackaging(item = {}) {
 }
 
 export function getItemQuantity(item = {}) {
-  return Array.isArray(item.variants) ? String(item.variants.length) : text(item.quantity);
+  return Array.isArray(item.variants) ? String(normalizeVariantRows(item.variants).reduce((count, row) => count + getVariantQuantity(row), 0)) : text(item.quantity);
 }
 
 export function withVariantSummary(item = {}) {

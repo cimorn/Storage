@@ -66,7 +66,7 @@ describe('card quantity display', () => {
     expect(card.metaLine).toBe('品牌 · 印花·镂空');
     expect(card.quantity).toBe(quantity);
   });
-  it.each(['2', '12', '1件', ''])('keeps other quantity text (%j)', quantity => {
-    expect(buildItemCardView({ brand: '品牌', quantity }).metaLine).toBe(quantity ? '品牌 · ' + quantity : '品牌');
+  it.each(['2', '12', '1件', ''])('keeps quantity out of the brand/style line (%j)', quantity => {
+    expect(buildItemCardView({ brand: '品牌', quantity }).metaLine).toBe('品牌');
   });
 });

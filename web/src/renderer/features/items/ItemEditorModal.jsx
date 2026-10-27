@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getItemVariants, MAX_ITEM_VARIANTS, withVariantSummary } from '../../../../shared/item-variants.mjs';
+import { getItemVariants, getVariantQuantity, MAX_ITEM_VARIANTS, withVariantSummary } from '../../../../shared/item-variants.mjs';
 import { getItemImageIds, MAX_ITEM_IMAGES, withImageSummary } from '../../../../shared/item-images.mjs';
 
 import {
@@ -161,6 +161,10 @@ export default function ItemEditorModal({
   );
   const level1Options = useMemo(() => getChildEntries(locations, null), [locations]);
   const assignedLocationIds = [...new Set(draft.locationIds.filter(Boolean))];
+  const imageOptions = [
+    ...draft.imagePaths.map((id, index) => ({ id, savedId: id, label: `图片${index + 1}` })),
+    ...pendingImages.map(row => ({ id: `pending:${row.key}`, url: row.url, label: row.file.name }))
+  ];
   const inheritedPrivate = isItemPrivate(
     { ...draft, locationIds: assignedLocationIds, isPrivate: false },
     { categories, locations }
@@ -189,7 +193,9 @@ export default function ItemEditorModal({
 
   function addVariant() {
     if (draft.variants.length >= MAX_ITEM_VARIANTS) return;
-    updateDraft({ variants: [...draft.variants, createVariantRow()] });
+    const used = new Set(draft.variants.map(row => row.imageId));
+    const imageId = imageOptions.find(option => !used.has(option.id))?.id || '';
+    updateDraft({ variants: [...draft.variants, createVariantRow({ color: '', size: '', isPackaged: false, quantity: '', imageId })] });
   }
 
   function removeVariant(rowKey) {
@@ -245,6 +251,8 @@ export default function ItemEditorModal({
       return;
     }
     replacePendingImages([...pendingImagesRef.current, ...added]);
+    const available = added.map(row => `pending:${row.key}`);
+    setDraft(current => ({ ...current, variants: current.variants.map(row => !row.imageId && available.length ? { ...row, imageId: available.shift() } : row) }));
     setDirtyDraft(true);
     setImageFeedback({ type: '', message: '' });
   }
@@ -253,12 +261,13 @@ export default function ItemEditorModal({
     if (saving) return;
     const imagePaths = draft.imagePaths.filter(id => id !== imageId);
     stagedImageCopyRef.current.delete(imageId);
-    updateDraft({ imagePaths, imagePath: imagePaths[0] || '' });
+    updateDraft({ imagePaths, imagePath: imagePaths[0] || '', variants: draft.variants.map(row => row.imageId === imageId ? { ...row, imageId: '' } : row) });
   }
 
   function removePendingImage(key) {
     if (saving) return;
     replacePendingImages(pendingImagesRef.current.filter(row => row.key !== key));
+    setDraft(current => ({ ...current, variants: current.variants.map(row => row.imageId === `pending:${key}` ? { ...row, imageId: '' } : row) }));
     setDirtyDraft(true);
   }
 
@@ -345,21 +354,24 @@ export default function ItemEditorModal({
         ...(mode === 'copy' ? {} : item),
         ...draft,
         notes: draft.notes,
-        variants: draft.variants.map(({ color, size, isPackaged }) => ({ color, size, isPackaged })),
+        variants: draft.variants.map(row => ({ color: row.color, size: row.size, isPackaged: row.isPackaged, quantity: getVariantQuantity(row), imageId: row.imageId || '' })),
         specification: normalizeItemDetailInput(draft.specification),
         locationIds: assignedLocationIds,
         locationId: assignedLocationIds[0] || null,
         tags: normalizeTagCodes(draft.tags)
       });
+      const optionIds = new Set(imageOptions.map(option => option.id));
+      if (nextItem.variants.some(row => row.imageId && !optionIds.has(row.imageId))) throw new Error('关联的图片已移除，请重新选择');
       if (imageAccess) {
         if (!draft.name.trim()) throw new Error('请填写物品名称');
         if (!draft.categoryId || !categories.some((category) => category.id === draft.categoryId)) {
           throw new Error('请先选择分类');
         }
-        const imagePaths = [];
+        const imagePaths = [], imageMap = new Map();
         for (const imageId of draft.imagePaths) {
           if (mode !== 'copy') {
             imagePaths.push(imageId);
+            imageMap.set(imageId, imageId);
             continue;
           }
           let copiedId = stagedImageCopyRef.current.get(imageId);
@@ -371,6 +383,7 @@ export default function ItemEditorModal({
             stagedImageCopyRef.current.set(imageId, copiedId);
           }
           imagePaths.push(copiedId);
+          imageMap.set(imageId, copiedId);
         }
         for (const row of pendingImages) {
           let uploadedId = stagedBrowserUploadRef.current.get(row.key);
@@ -382,13 +395,16 @@ export default function ItemEditorModal({
             stagedBrowserUploadRef.current.set(row.key, uploadedId);
           }
           imagePaths.push(uploadedId);
+          imageMap.set(`pending:${row.key}`, uploadedId);
         }
         Object.assign(nextItem, withImageSummary({ imagePaths }));
+        nextItem.variants = nextItem.variants.map(row => ({ ...row, imageId: row.imageId ? imageMap.get(row.imageId) : '' }));
       }
       if (!isCurrentSave()) return;
+      nextItem.variants = getItemVariants(nextItem);
       await onSave?.(nextItem);
       if (!isCurrentSave()) return;
-      setDraft(current => ({ ...current, imagePaths: nextItem.imagePaths, imagePath: nextItem.imagePath }));
+      setDraft(current => ({ ...current, imagePaths: nextItem.imagePaths, imagePath: nextItem.imagePath, variants: nextItem.variants.map((row, index) => ({ ...row, rowKey: current.variants[index].rowKey })) }));
       replacePendingImages([]);
       stagedBrowserUploadRef.current.clear();
       stagedImageCopyRef.current.clear();
@@ -463,7 +479,7 @@ export default function ItemEditorModal({
               </label>
             </div>
 
-            <ItemVariantFields variants={draft.variants} maxVariants={MAX_ITEM_VARIANTS}
+            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS}
               onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} />
 
             <div className="form-row form-row--2 item-editor-modal__paired-row">
@@ -621,7 +637,7 @@ export default function ItemEditorModal({
           </fieldset>
           </div>
           <section role="tabpanel" id="item-editor-information-panel" aria-labelledby="item-editor-information-tab" hidden={activeTab !== 'information'}>
-            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
+            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} imageOptions={imageOptions} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
           </section>
         </div>
 
