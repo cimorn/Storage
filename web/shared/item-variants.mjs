@@ -61,7 +61,9 @@ export function getItemVariants(item = {}) {
   if (Object.hasOwn(item, 'variants')) {
     const rows = normalizeVariantRows(item.variants);
     const images = getItemImageIds(item);
-    if (rows.length === 1 && images.length === 1 && !Object.hasOwn(rows[0], 'imageId')) rows[0].imageId = images[0];
+    // Old records have ordered lists but no association fields. Initialize
+    // only a complete one-to-one list; explicit empty assignments stay empty.
+    if (rows.length === images.length && rows.every(row => !Object.hasOwn(row, 'imageId'))) rows.forEach((row, index) => { row.imageId = images[index]; });
     return rows;
   }
   const quantity = text(item.quantity);
@@ -73,7 +75,7 @@ export function getItemVariants(item = {}) {
   const details = parseLegacyVariant(item.notes) || { color: '', size: '' };
   const rows = Array.from({ length: count }, () => ({ ...details, isPackaged: item.isPackaged === true }));
   const images = getItemImageIds(item);
-  if (rows.length === 1 && images.length === 1) rows[0].imageId = images[0];
+  if (rows.length === images.length) rows.forEach((row, index) => { row.imageId = images[index]; });
   return rows;
 }
 

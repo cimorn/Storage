@@ -41,6 +41,14 @@ describe('per-variant quantities and exclusive photo bindings', () => {
   it('also pairs an older single-image item before it has structured variants', () => {
     expect(variants.getItemVariants({ imagePath: A, notes: '白色 S', quantity: '1' })[0].imageId).toBe(A);
   });
+  it('initializes old equal-length photo/specification lists by the user-approved order', () => {
+    const historical = item({ variants: [row(), row({ color: '红色' })] });
+    expect(variants.getItemVariants(historical).map(value => value.imageId)).toEqual([A, B]);
+    const linked = { ...historical, variants: [row({ quantity: 1, imageId: A }), row({ color: '红色', quantity: 1, imageId: B })] };
+    historical.updatedAt = '2020-01-01';
+    expect(applyItemTimestamps(project(historical), project(linked)).items[0].updatedAt).toBe('2020-01-01');
+    expect(variants.getItemVariants({ ...historical, variants: [row({ imageId: '' }), row()] }).map(value => value.imageId)).toEqual(['', undefined]);
+  });
   it('validates bindings against the photos of that exact item', () => {
     expect(validateProject(project(item())).items[0]).toMatchObject({ quantity: '4', variants: [{ quantity: 3, imageId: A }, { quantity: 1, imageId: B }] });
     expect(() => validateProject(project(item({ imagePaths: [A] })))).toThrow();
