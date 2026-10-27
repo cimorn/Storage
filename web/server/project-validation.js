@@ -1,6 +1,6 @@
 'use strict';
 const {StorageError}=require('./errors');
-const {normalizeVariantRows,withVariantSummary}=require('../shared/item-variants.mjs');
+const {normalizeVariantRows,getItemVariants,withVariantSummary}=require('../shared/item-variants.mjs');
 const {getItemImageIds}=require('../shared/item-images.mjs');
 const ITEM_FIELDS=['barcode','code','name','brand','quantity','specification','notes'];
 const META_FIELDS=['name','createdAt','updatedAt','appVersion'];
@@ -65,6 +65,10 @@ function validateProject(input,{allowImagePaths=false}={}){
     if(imageIds.some(imageId=>imageId.length>(allowImagePaths?2048:128)||(!allowImagePaths&&!/^img_[a-f0-9-]{36}$/.test(imageId))))throw new StorageError('INVALID_IMAGE');
     item.imagePath=imageIds[0]||'';
     if(Object.hasOwn(value,'imagePaths'))item.imagePaths=imageIds;
+    if(item.variants){
+      item.variants=getItemVariants(item);
+      if(item.variants.some(row=>row.imageId&&!imageIds.includes(row.imageId)))throw new StorageError('INVALID_IMAGE');
+    }
     item.categoryPath=categoryLineage(item.categoryId).map(x=>x.name).join(' / ');
     item.locationPath=locationLineage(item.locationId).map(x=>x.name).join(' / ');
     if(Object.hasOwn(value,'locationIds'))item.locationPaths=assignedLocations.map(locationId=>locationLineage(locationId).map(x=>x.name).join(' / '));

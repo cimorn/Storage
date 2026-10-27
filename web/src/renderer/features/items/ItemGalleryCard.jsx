@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useImagePreviewState } from '../web/ImageAccessContext';
-import { hasItemPackaging } from '../../../../shared/item-variants.mjs';
+import { formatItemVariants, getItemVariants, getVariantQuantity, hasItemPackaging } from '../../../../shared/item-variants.mjs';
 import { getItemImageIds } from '../../../../shared/item-images.mjs';
 
 export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected = false, onClick }) {
@@ -9,6 +9,8 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
   const [selectedImageId, setSelectedImageId] = useState('');
   const imageIndex = Math.max(0, imageIds.indexOf(selectedImageId));
   const currentImageId = imageIds[imageIndex] || '';
+  const currentVariant = currentImageId ? getItemVariants(item).find(row => row.imageId === currentImageId) : null;
+  const currentSpecification = currentVariant ? formatItemVariants({ variants: [currentVariant] }) : item.note;
   const gestureRef = useRef(null);
   const suppressClickRef = useRef(false);
   const { url: imageSrc, status: imageStatus } = useImagePreviewState(currentImageId, imageIndex === 0 ? item.imageSrc : '', { targetRef: imageTargetRef });
@@ -78,6 +80,7 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
             {imageStatus === 'none' ? '无图' : imageStatus === 'error' ? '图片加载失败' : '图片加载中…'}
           </div>
         )}
+        {currentVariant ? <span className="item-gallery-card__quantity" aria-label={`当前规格数量${getVariantQuantity(currentVariant)}`} aria-live="polite">{getVariantQuantity(currentVariant)}</span> : null}
         {imageIds.length > 1 ? <span className="item-gallery-card__image-count" aria-live="polite" aria-label={`第${imageIndex + 1}张，共${imageIds.length}张`}>{imageIndex + 1}/{imageIds.length}</span> : null}
       </div>
 
@@ -85,7 +88,7 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
         <div className="item-gallery-card__title-row">
           <strong>{item.title}</strong>
         </div>
-        <div className="item-gallery-card__variant-row">{item.note}</div>
+        <div className="item-gallery-card__variant-row">{currentSpecification}</div>
         <div className="item-gallery-card__meta-row">
           <span className="item-gallery-card__meta-text">{item.metaLine || '未填写品牌或款式'}</span>
           {hasItemPackaging(item) ? (

@@ -39,6 +39,18 @@ function preserveOptionalMetadata(current,incoming){
     const previous=previousItems.get(item?.id);if(!previous)return item;
     const next={...item};
     if(!Object.hasOwn(item,'variants')&&Object.hasOwn(previous,'variants'))next.variants=previous.variants;
+    if(Array.isArray(item.variants)&&Array.isArray(previous.variants)){
+      const hasMetadata=previous.variants.some(row=>Object.hasOwn(row,'quantity')||Object.hasOwn(row,'imageId'));
+      const oldClient=item.variants.some(row=>!Object.hasOwn(row||{},'quantity')&&!Object.hasOwn(row||{},'imageId'));
+      if(hasMetadata&&oldClient){
+        if(item.variants.length!==previous.variants.length||item.variants.some((row,i)=>row?.color!==previous.variants[i].color||row?.size!==previous.variants[i].size||row?.isPackaged!==previous.variants[i].isPackaged))throw new StorageError('CONFLICT');
+        next.variants=item.variants.map((row,i)=>{
+          const old=previous.variants[i],result={...row};
+          for(const field of ['quantity','imageId'])if(!Object.hasOwn(row,field)&&Object.hasOwn(old,field))result[field]=old[field];
+          return result;
+        });
+      }
+    }
     if(!Object.hasOwn(item,'imagePaths')&&Object.hasOwn(previous,'imagePaths')){
       // Old tabs only know the primary: replace/remove that slot, retaining
       // photos the tab could not see. New clients send [] to remove all.
@@ -335,9 +347,10 @@ function createInventoryService({repository,objects,encryptionKey,rules={},image
       // Validate all input before writing. Each bound item receives its own
       // image ID, even when the source project reused one local file.
       for(const item of validated.items){
-        const imageIds=[];
-        for(const sourceId of getItemImageIds(item)){const uploaded=await stageImage(inputs.get(sourceId));imageIds.push(uploaded.imageId);}
+        const imageIds=[],imageMap=new Map();
+        for(const sourceId of getItemImageIds(item)){const uploaded=await stageImage(inputs.get(sourceId));imageIds.push(uploaded.imageId);imageMap.set(sourceId,uploaded.imageId);}
         item.imagePath=imageIds[0]||'';if(Object.hasOwn(item,'imagePaths'))item.imagePaths=imageIds;
+        if(item.variants)item.variants=item.variants.map(row=>row.imageId?{...row,imageId:imageMap.get(row.imageId)}:row);
         item.isPrivate=classify(item);
       }
       snapshot=await resume();

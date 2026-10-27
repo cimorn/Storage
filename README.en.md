@@ -29,9 +29,9 @@ For phone access, set `STORAGE_BIND_ADDRESS=0.0.0.0` and `STORAGE_PUBLIC_ORIGIN`
 
 Enter the access password to manage items and photos. Combine category, location, tag, and packaging filters. Drag categories and locations to reorder them.
 
-Add color, size, and packaging rows to each item. Each row represents one physical item; the quantity is calculated from the row count. Leave color or size blank when it does not apply. Open an item to edit rows or view them in the Information tab. The card shows a packaging icon if any row is packaged. Bulk packaging changes apply to all rows of the selected items.
+Add color, size, quantity, and packaging rows to each item. A blank quantity means 1; the item total sums all row quantities. Use the photo button on a row to associate a photo. Each photo can belong to only one specification. Leave color or size blank when it does not apply. Edit rows or view their photos and quantities in the Information tab. The card shows a packaging icon if any row is packaged. Bulk packaging changes apply to all rows of the selected items.
 
-Cards show the name, grouped color and size (for example `White&Red·S&M`), and brand/style on three lines. The Information tab shows categories and locations above the variant table. Store up to 20 photos per item. Choose photos beside the page tabs, preview or remove them in the editor, and upload only on Save. Scroll the thumbnail strip horizontally. Click a card to edit, or drag horizontally to switch photos. Left and right arrow keys also switch photos.
+Cards show the name, specification, and brand/style on three lines. The associated quantity appears at the top-right of the photo; color, size, and quantity follow the current photo. Photos without an association show the item's grouped specification summary. The Information tab shows categories and locations above the variant table. Store up to 20 photos per item. Choose photos beside the page tabs, preview or remove them in the editor, and upload only on Save. Scroll the thumbnail strip horizontally. Click a card to edit, or drag horizontally to switch photos. Left and right arrow keys also switch photos.
 
 Uploads become WebP images with a maximum long edge of 1920 pixels, without enlarging the source, and photo metadata is removed. Photos follow category moves, and backups include every photo of each item.
 

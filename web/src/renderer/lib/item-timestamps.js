@@ -1,5 +1,5 @@
 import { getItemImageIds } from '../../../shared/item-images.mjs';
-import { getItemVariants } from '../../../shared/item-variants.mjs';
+import { getItemVariants, getVariantQuantity } from '../../../shared/item-variants.mjs';
 
 const TEXT_FIELDS = ['barcode', 'code', 'name', 'brand', 'specification', 'categoryId', 'imagePath'];
 
@@ -9,7 +9,7 @@ function variantContent(item) {
   // Their obsolete notes and redundant summary fields are format cleanup.
   // Preserve raw values when the old count cannot be converted safely.
   return rows.length
-    ? [String(rows.length), rows.some(row => row.isPackaged), rows.map(row => [row.color, row.size, row.isPackaged])]
+    ? [String(rows.reduce((sum,row)=>sum+getVariantQuantity(row),0)), rows.some(row => row.isPackaged), rows.map(row => [row.color, row.size, row.isPackaged, getVariantQuantity(row), row.imageId||''])]
     : [String(item.quantity ?? ''), item.isPackaged === true, null, String(item.notes ?? '')];
 }
 

@@ -122,7 +122,7 @@ describe('copy a saved item into a new draft', () => {
     await user.click(screen.getByLabelText('包装2'));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
-    expect(onCreateItem.mock.calls[0][0].variants).toEqual([{ color: '蓝色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: false }]);
+    expect(onCreateItem.mock.calls[0][0].variants).toEqual([{ color: '蓝色', size: 'S', isPackaged: false, quantity: 1, imageId: '' }, { color: '黑色', size: 'M', isPackaged: false, quantity: 1, imageId: '' }]);
     expect(source.variants).toEqual([{ color: '白色', size: 'S', isPackaged: false }, { color: '黑色', size: 'M', isPackaged: true }]);
   });
 
