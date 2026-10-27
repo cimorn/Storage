@@ -87,7 +87,7 @@ describe('variant photo and quantity editor', () => {
     expect(within(table).getByRole('columnheader', { name: '图片', exact: true })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: '数量', exact: true })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: '3', exact: true })).toBeInTheDocument();
-    expect(within(screen.getByRole('tabpanel', { name: '信息页', exact: true })).getByText('共4件')).toBeInTheDocument();
+    expect(screen.getByText('共4件').closest('.item-editor-modal__header')).not.toBeNull();
   });
   it('rejects a zero quantity before uploading pending photos', async () => {
     const { user, api, onSave } = setup();

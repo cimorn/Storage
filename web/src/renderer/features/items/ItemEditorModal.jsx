@@ -166,6 +166,10 @@ export default function ItemEditorModal({
   );
   const level1Options = useMemo(() => getChildEntries(locations, null), [locations]);
   const assignedLocationIds = [...new Set(draft.locationIds.filter(Boolean))];
+  const categoryPath = buildNodePath(categories, draft.categoryId);
+  const locationPaths = assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean);
+  let totalQuantity;
+  try { totalQuantity = draft.variants.reduce((total, row) => total + getVariantQuantity(row), 0); } catch { totalQuantity = null; }
   const availableImageOptions = [
     ...draft.imagePaths.map((id, index) => ({ id, savedId: id, label: `图片${index + 1}`, alt: `已保存图片${index + 1}` })),
     ...pendingImages.map((row, index) => ({ id: `pending:${row.key}`, url: row.url, label: row.file.name, alt: `待上传图片${index + 1}：${row.file.name}` }))
@@ -479,9 +483,14 @@ export default function ItemEditorModal({
         inert={visiblePreview ? true : undefined}
       >
         <div className="dialog-header item-editor-modal__header">
-          <div>
+          <div className="item-editor-modal__title">
             <h2 id="item-editor-title">{mode === 'copy' ? '复制新增' : mode === 'create' ? '新增物品' : draft.name || '未命名物品'}</h2>
           </div>
+          <dl className="item-editor-summary" aria-label="物品分类和位置">
+            <div><dt>分类</dt><dd>{categoryPath || '未选'}</dd></div>
+            <div><dt>位置</dt><dd>{locationPaths.join('；') || '未选'}</dd></div>
+          </dl>
+          <p className="item-editor-modal__count" aria-live="polite">{totalQuantity === null ? '请检查数量' : `共${totalQuantity}件`}</p>
           <button className="ghost-button" type="button" onClick={requestClose} disabled={saving} aria-label="关闭物品弹窗">
             关闭
           </button>
@@ -687,7 +696,7 @@ export default function ItemEditorModal({
           </fieldset>
           </section>
           <section role="tabpanel" id="item-editor-information-panel" aria-labelledby="item-editor-information-tab" hidden={activeTab !== 'information'}>
-            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} imageOptions={imageOptions} onPreview={previewPhoto} categoryPath={buildNodePath(categories, draft.categoryId)} locationPaths={assignedLocationIds.map(id => buildNodePath(locations, id)).filter(Boolean)} /> : null}
+            {activeTab === 'information' ? <ItemInformationPage variants={draft.variants} imageOptions={imageOptions} onPreview={previewPhoto} /> : null}
           </section>
         </div>
 

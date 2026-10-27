@@ -6,7 +6,7 @@ function SavedImage({ imageId, index, saving, onRemove, onPreview }) {
   const preview = useImagePreviewState(imageId, '', { targetRef });
   return (
     <div className="web-item-image-thumbnail" ref={targetRef}>
-      <button type="button" className="web-item-image-thumbnail__open" aria-label={`放大图片${index + 1}`} onClick={() => onPreview?.({ savedId: imageId, label: `图片${index + 1}` })}>{preview.url ? <img src={preview.url} alt={`已保存图片${index + 1}`} draggable="false" loading="lazy" decoding="async" /> : (
+      <button type="button" className="web-item-image-thumbnail__open" aria-label={`放大图片${index + 1}`} onClick={() => onPreview?.({ savedId: imageId, label: `图片${index + 1}`, previewUrl: preview.url })}>{preview.url ? <img src={preview.url} alt={`已保存图片${index + 1}`} draggable="false" loading="lazy" decoding="async" /> : (
         <span className="web-item-image-thumbnail__status" role="status">{preview.status === 'error' ? '图片暂不可用' : '读取图片…'}</span>
       )}</button>
       {index === 0 ? <span className="web-item-image-thumbnail__cover">封面</span> : null}

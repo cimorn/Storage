@@ -1,17 +1,14 @@
-import { getVariantQuantity, MAX_VARIANT_QUANTITY } from '../../../../shared/item-variants.mjs';
+import { MAX_VARIANT_QUANTITY } from '../../../../shared/item-variants.mjs';
 import VariantImageThumbnail from './VariantImageThumbnail';
 import useVariantDrag from './useVariantDrag';
 
 export default function ItemVariantFields({ variants, imageOptions = [], maxVariants, onChange, onAdd, onRemove, onReorder, onUpload, onRemoveImage, onPreview }) {
   const { rootRef, drag, handleProps } = useVariantDrag(variants, onReorder);
-  let count;
-  try { count = variants.reduce((total, row) => total + getVariantQuantity(row), 0); } catch { count = null; }
   return (
     <section className="item-variant-editor" aria-label="物品规格" ref={rootRef}>
       <div className="item-variant-editor__heading">
         <strong>规格</strong>
         <div className="item-variant-editor__heading-actions">
-          <span>{count === null ? '请检查数量' : `共${count}件`}</span>
           <button className="item-variant-editor__add" type="button" aria-label="添加颜色" title="添加颜色和尺码" disabled={variants.length >= maxVariants} onClick={onAdd}>＋</button>
         </div>
       </div>
@@ -23,7 +20,7 @@ export default function ItemVariantFields({ variants, imageOptions = [], maxVari
           <button className="item-variant-editor__drag" type="button" aria-label={`拖动规格${index + 1}`} title="拖动排序，也可用上下方向键" {...handleProps(row)}>⠿</button>
           <div className="item-variant-editor__photo">
             {image ? <>
-              <VariantImageThumbnail imageId={image.savedId} url={image.url} alt={image.alt || image.label} previewLabel={`放大规格${index + 1}图片`} onPreview={() => onPreview(image)} />
+              <VariantImageThumbnail imageId={image.savedId} url={image.url} alt={image.alt || image.label} previewLabel={`放大规格${index + 1}图片`} onPreview={previewUrl => onPreview({ ...image, previewUrl })} />
               <button type="button" className="item-variant-editor__clear-image" aria-label={`移除图片 ${imageIndex + 1}`} title="移除图片" onClick={() => onRemoveImage(image.id)}>×</button>
             </> : <span className="item-variant-editor__empty-photo" aria-hidden="true" />}
           </div>

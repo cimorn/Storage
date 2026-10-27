@@ -101,21 +101,20 @@ describe('compact NAS item controls', () => {
     expect(addLocation.closest('.item-location-editor__controls')).toContainElement(within(location).getByRole('button', { name: '移除位置 1' }));
   });
 
-  it('shows the current category and every ordered location above the information table', async () => {
-    const { user } = editor({ ...item, categoryId: 'child', locationIds: ['other', 'box'] });
+  it('keeps the current category and every ordered location in the header above the table', async () => {
+    const { user, container } = editor({ ...item, categoryId: 'child', locationIds: ['other', 'box'] });
     await user.click(screen.getByRole('tab', { name: '信息页' }));
-    const panel = screen.getByRole('tabpanel', { name: '信息页' });
-    const category = within(panel).getByText('日常 / 子类');
-    const first = within(panel).getByText('另一个房间');
-    const second = within(panel).getByText('房间 / 柜子 / 盒子');
-    const table = within(panel).getByRole('table');
+    const header=within(container.querySelector('.item-editor-modal__header'));
+    const category=header.getByText('日常 / 子类');
+    expect(header.getByText('另一个房间；房间 / 柜子 / 盒子')).toBeInTheDocument();
+    const panel=screen.getByRole('tabpanel', { name: '信息页' });
+    const table=within(panel).getByRole('table');
     expect(category.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(second.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(panel).queryByText('分类')).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: '编辑页' }));
     await user.selectOptions(screen.getByLabelText('子分类'), '');
     await user.click(screen.getByRole('tab', { name: '信息页' }));
-    expect(within(screen.getByRole('tabpanel', { name: '信息页' })).getByText('日常')).toBeInTheDocument();
+    expect(header.getByText('日常')).toBeInTheDocument();
   });
 
   it('allows the only row packaging to be removed and shows packaging on the gallery card', async () => {
