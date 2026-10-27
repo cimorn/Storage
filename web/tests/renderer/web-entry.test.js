@@ -24,8 +24,9 @@ function setup(options = {}) {
   const fetchImpl = vi.fn(async (url) => response(url === '/api/session'
     ? { authenticated: false }
     : url === '/api/login' ? { authenticated: true, csrfToken: 'current' } : project));
-  stop = startWebEntry({ root: document.getElementById('root'), fetchImpl, loadApp, ...options });
-  return { fetchImpl, loadApp, mountWebApp };
+  const recovery = { recoverOnce: vi.fn(() => false), reload: vi.fn(), complete: vi.fn() };
+  stop = startWebEntry({ recovery, ...(options.timeoutMs ? { moduleTimeoutMs: options.timeoutMs } : {}), root: document.getElementById('root'), fetchImpl, loadApp, ...options });
+  return { fetchImpl, loadApp, mountWebApp, recovery: options.recovery || recovery };
 }
 function submit(value = 'correct-password') {
   const input = screen.getByLabelText('访问密码');
@@ -134,18 +135,6 @@ describe('lightweight browser entry', () => {
     expect(mountWebApp).toHaveBeenCalledTimes(1);
   });
 
-  it('retries a failed module load without repeating an already successful session/project bootstrap', async () => {
-    const mountWebApp = vi.fn();
-    const loadApp = vi.fn().mockRejectedValueOnce(new Error('界面加载失败')).mockResolvedValue({ mountWebApp });
-    const fetchImpl = vi.fn(async (url) => response(url === '/api/session' ? { authenticated: true, csrfToken: 'current' } : project));
-    setup({ fetchImpl, loadApp });
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('界面加载失败'));
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    await waitFor(() => expect(mountWebApp).toHaveBeenCalledTimes(1));
-    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual(['/api/session', '/api/project']);
-    expect(loadApp).toHaveBeenCalledTimes(2);
-  });
-
   it('bounds a stalled app download and can retry when that download finishes', async () => {
     vi.useFakeTimers();
     const module = deferred();
@@ -233,22 +222,57 @@ describe('lightweight browser entry', () => {
     expect(mountWebApp).not.toHaveBeenCalled();
   });
 
-  it('ignores an old retry failure after the cached page has started a fresh session check', async () => {
+  it('does not reload for an old module failure after the page has hidden and restored without a session', async () => {
     const pending = deferred();
-    const mountWebApp = vi.fn();
-    const loadApp = vi.fn().mockRejectedValueOnce(new Error('首次下载失败')).mockImplementation(() => pending.promise);
     let sessions = 0;
-    const fetchImpl = vi.fn(async (url) => response(url === '/api/session'
+    const fetchImpl = vi.fn(async url => response(url === '/api/session'
       ? { authenticated: ++sessions === 1, csrfToken: 'before-hide' } : project));
-    setup({ fetchImpl, loadApp });
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('首次下载失败'));
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    const { recovery, mountWebApp } = setup({ fetchImpl, loadApp: () => pending.promise });
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
     transition('pagehide', true);
     transition('pageshow', true);
     await waitFor(() => expect(sessions).toBe(2));
-    pending.reject(new Error('旧重试失败'));
+    pending.reject(new TypeError('Importing a module script failed.'));
     await flush();
+    expect(recovery.recoverOnce).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(mountWebApp).not.toHaveBeenCalled();
   });
+
+  it('recovers a Safari module failure only after a successful credential bootstrap', async () => {
+    const recovery = { recoverOnce: vi.fn(() => true), reload: vi.fn(), complete: vi.fn() };
+    const loadApp = vi.fn().mockRejectedValue(new TypeError('Importing a module script failed.'));
+    const { fetchImpl } = setup({ recovery, loadApp });
+    await flush();
+    expect(recovery.recoverOnce).not.toHaveBeenCalled();
+    submit();
+    await waitFor(() => expect(recovery.recoverOnce).toHaveBeenCalledTimes(1));
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual(['/api/session', '/api/login', '/api/project']);
+    expect(screen.getByLabelText('访问密码')).toHaveValue('');
+    expect(localStorage.length + sessionStorage.length).toBe(0);
+  });
+  it('offers a real document reload after a repeated native import failure instead of importing the rejected module again', async () => {
+    const loadApp = vi.fn().mockRejectedValue(new TypeError('Importing a module script failed.'));
+    const fetchImpl = vi.fn(async url => response(url === '/api/session' ? { authenticated: true } : project));
+    const { recovery } = setup({ loadApp, fetchImpl });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('界面文件下载失败'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Importing');
+    fireEvent.click(screen.getByRole('button', { name: '重新加载' }));
+    expect(recovery.reload).toHaveBeenCalledTimes(1);
+    expect(loadApp).toHaveBeenCalledTimes(1);
+  });
+  it('lets a slow module finish after 15 seconds without repeating the login or project read', async () => {
+    vi.useFakeTimers();
+    const module = deferred(), mountWebApp = vi.fn();
+    const fetchImpl = vi.fn(async url => response(url === '/api/session' ? { authenticated: true } : project));
+    const { recovery } = setup({ loadApp: () => module.promise, fetchImpl });
+    await vi.advanceTimersByTimeAsync(16000);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    module.resolve({ mountWebApp });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mountWebApp).toHaveBeenCalledTimes(1);
+    expect(recovery.complete).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
 });
