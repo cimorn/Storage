@@ -16,16 +16,19 @@ function SavedImage({ imageId, index, saving, onRemove }) {
   );
 }
 
-export default function ItemImageEditor({ imageIds, pendingImages, saving, onRemoveSaved, onRemovePending }) {
+export default function ItemImageEditor({ imageIds, pendingImages, imageOrder, saving, onRemoveSaved, onRemovePending }) {
   const count = imageIds.length + pendingImages.length;
+  const entries = [...imageIds.map(id => ({ id })), ...pendingImages.map((row, index) => ({ id: `pending:${row.key}`, row, pendingIndex: index }))];
+  const byId = new Map(entries.map(entry => [entry.id, entry]));
+  const ordered = imageOrder ? imageOrder.map(id => byId.get(id)).filter(Boolean) : entries;
   return (
     <div className={`web-item-image-selection${count ? ' has-images' : ''}`} aria-label="物品图片选择状态">
       {count ? <div className="web-item-image-strip" role="group" aria-label="物品图片，可横向滚动">
-        {imageIds.map((imageId, index) => <SavedImage key={imageId} imageId={imageId} index={index} saving={saving} onRemove={onRemoveSaved} />)}
-        {pendingImages.map((row, index) => {
-          const position = imageIds.length + index;
-          return <div className="web-item-image-thumbnail" key={row.key} title={row.file.name}>
-            <img src={row.url} alt={`待上传图片${index + 1}：${row.file.name}`} draggable="false" loading="lazy" decoding="async" />
+        {ordered.map((entry, position) => {
+          if (!entry.row) return <SavedImage key={entry.id} imageId={entry.id} index={position} saving={saving} onRemove={onRemoveSaved} />;
+          const { row, pendingIndex } = entry;
+          return <div className="web-item-image-thumbnail" key={entry.id} title={row.file.name}>
+            <img src={row.url} alt={`待上传图片${pendingIndex + 1}：${row.file.name}`} draggable="false" loading="lazy" decoding="async" />
             <span className="web-item-image-thumbnail__pending">{row.file.name}</span>
             {position === 0 ? <span className="web-item-image-thumbnail__cover">封面</span> : null}
             <button type="button" className="web-item-image-thumbnail__remove" aria-label={`移除图片 ${position + 1}`}

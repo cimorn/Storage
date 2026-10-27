@@ -83,7 +83,7 @@ describe('shared variant helpers', () => {
     expect(helpers.formatItemVariants).toBeTypeOf('function');
     const row = { color: '白色', size: 'S', isPackaged: false };
     const item = { variants: [row, { ...row }, { color: '黑色', size: '', isPackaged: true }], notes: '旧文字' };
-    expect(helpers.formatItemVariants(item)).toBe('白色&黑色·S');
+    expect(helpers.formatItemVariants(item)).toBe('白色·S | 黑色');
     expect(helpers.getItemQuantity(item)).toBe('3');
     expect(helpers.formatItemVariants({ variants: [{ color: '', size: '', isPackaged: true }], notes: '旧文字' })).toBe('');
   });
@@ -96,14 +96,14 @@ describe('shared variant helpers', () => {
     expect(legacy.notes).toBe('白色 S');
   });
 
-  it('groups distinct colors and sizes with ampersands, retaining row order in each group', () => {
+  it('groups colors under each size, retaining first-seen group and color order', () => {
     const variants = [
       { color: '白色', size: 'S', isPackaged: true },
       { color: '红色', size: 'M', isPackaged: false },
       { color: '白色', size: 'M', isPackaged: false }
     ];
-    expect(helpers.formatItemVariants({ variants })).toBe('白色&红色·S&M');
-    expect(helpers.formatItemVariants({ variants: variants.map(row => ({ ...row, color: '' })) })).toBe('S&M');
+    expect(helpers.formatItemVariants({ variants })).toBe('白色·S | 红色/白色·M');
+    expect(helpers.formatItemVariants({ variants: variants.map(row => ({ ...row, color: '' })) })).toBe('S | M');
   });
 
   it('does not restore a cleared recognized specification from historical notes', () => {

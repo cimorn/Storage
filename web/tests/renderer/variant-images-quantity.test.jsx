@@ -32,7 +32,7 @@ describe('variant photo and quantity editor', () => {
     expect(screen.getByRole('button', { name: '选择图片2', exact: true })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: '不关联图片', exact: true }));
     await user.click(screen.getByRole('button', { name: '规格2图片', exact: true }));
-    await user.click(screen.getByRole('button', { name: '选择图片1', exact: true }));
+    await user.click(screen.getByRole('button', { name: '选择图片2', exact: true }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0].variants.map(value => value.imageId)).toEqual(['', 'a']);
@@ -105,11 +105,11 @@ describe('photo-specific card details', () => {
     const { container } = setup({ card: true });
     const button = screen.getByRole('button', { name: 'T恤', exact: true });
     expect(screen.getByLabelText('当前规格数量3')).toBeInTheDocument();
-    expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('白色·S');
-    expect(container.querySelector('.item-gallery-card__meta-row')).toHaveTextContent(/^Demo · 印花$/);
+    expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('白色·S | 红色·M');
+    expect(container.querySelector('.item-gallery-card__meta-row')).toHaveTextContent(/^印花$/);
     await act(async () => fireEvent.keyDown(button, { key: 'ArrowRight' }));
     expect(screen.getByLabelText('当前规格数量1')).toBeInTheDocument();
-    expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('红色·M');
+    expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('白色·S | 红色·M');
     expect(screen.queryByLabelText('当前规格数量3')).not.toBeInTheDocument();
   });
 });

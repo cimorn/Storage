@@ -36,7 +36,11 @@
 .item-variant-editor__heading strong { font-size: 0.85rem; }
 .item-variant-editor__heading-actions { display: flex; align-items: center; gap: 8px; }
 .item-variant-editor__heading-actions > span, .item-information-page__count { color: var(--text-soft); font-size: 0.8rem; }
-.item-variant-editor__row { display: grid; grid-template-columns: 32px minmax(0, 1fr) minmax(0, 0.65fr) 52px auto; align-items: center; gap: 6px; width: 100%; max-width: 460px; min-width: 0; }
+.item-variant-editor__row { display: grid; grid-template-columns: 16px 32px minmax(0, 1fr) minmax(0, 0.65fr) 52px auto; align-items: center; gap: 6px; width: 100%; max-width: 480px; min-width: 0; border-block: 1px solid transparent; }
+.web-item-editor-backdrop .item-variant-editor__drag { width: 16px; height: 32px; min-height: 32px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text-soft); font-size: 18px; cursor: grab; touch-action: none; user-select: none; }
+.item-variant-editor__drag:active { cursor: grabbing; }
+.item-variant-editor__row.is-drop-before { border-top-color: var(--accent); }
+.item-variant-editor__row.is-drop-after { border-bottom-color: var(--accent); }
 .item-variant-editor__quantity { appearance: textfield; }
 .item-variant-editor__quantity::-webkit-inner-spin-button, .item-variant-editor__quantity::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .variant-image-thumbnail { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; overflow: hidden; border-radius: 4px; background: var(--panel-muted); color: var(--text-soft); }
@@ -83,7 +87,7 @@
 .item-information-table th:last-child { width: 24%; }
 .item-information-table th, .item-information-table td { padding: 10px 6px; }
 @media (max-width: 400px) {
-  .item-variant-editor__row { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 0.7fr) 42px auto; gap: 4px; }
+  .item-variant-editor__row { grid-template-columns: 16px 32px minmax(0, 1fr) minmax(0, 0.7fr) 42px auto; gap: 4px; }
   .web-item-editor-backdrop .item-variant-editor__row > input { padding-inline: 4px; }
 }
 .web-item-editor-backdrop .item-editor-modal__media, .web-item-editor-backdrop .item-editor-modal__form { flex: 0 0 auto; width: 100%; min-width: 0; overflow: visible; margin: 0; padding: 0; border: 0; }

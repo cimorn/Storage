@@ -97,7 +97,10 @@ export function withVariantSummary(item = {}) {
 
 export function formatItemVariants(item = {}) {
   const rows = getItemVariants(item);
-  const colors = [...new Set(rows.map(row => row.color).filter(Boolean))].join('&');
-  const sizes = [...new Set(rows.map(row => row.size).filter(Boolean))].join('&');
-  return [colors, sizes].filter(Boolean).join('·');
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row.size)) groups.set(row.size, new Set());
+    if (row.color) groups.get(row.size).add(row.color);
+  }
+  return [...groups].map(([size, colors]) => [[...colors].join('/'), size].filter(Boolean).join('·')).filter(Boolean).join(' | ');
 }

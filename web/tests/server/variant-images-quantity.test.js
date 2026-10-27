@@ -54,6 +54,11 @@ describe('per-variant quantities and exclusive photo bindings', () => {
     expect(() => validateProject(project(item({ imagePaths: [A] })))).toThrow();
     expect(() => validateProject(project(item({ variants: [row({ imageId: {} })] })))).toThrow();
   });
+  it('makes the first specification photo the cover and keeps extra unassigned photos', () => {
+    const extra='img_33333333-3333-4333-8333-333333333333';
+    const source=item({imagePaths:[A,B,extra],variants:[row({imageId:B}),row({color:'红色',imageId:A})]});
+    expect(validateProject(project(source)).items[0]).toMatchObject({imagePath:B,imagePaths:[B,A,extra]});
+  });
   it('timestamps a quantity or photo-association edit, while default materialization preserves recency', () => {
     const old = item({ updatedAt: '2020-01-01' }), before = project(old), now = new Date('2026-10-26');
     for (const patch of [{ quantity: 4 }, { imageId: '' }]) {

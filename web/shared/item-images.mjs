@@ -1,5 +1,10 @@
 export const MAX_ITEM_IMAGES = 20;
 
+export function orderImagesByVariants(imageIds, variants = []) {
+  const available = new Set(imageIds);
+  return [...new Set([...variants.map(row => row.imageId).filter(id => id && available.has(id)), ...imageIds])];
+}
+
 function imageReference(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 2048 || /[\u0000-\u001f\u007f]/u.test(value)) {
     throw new TypeError('物品图片数据格式不正确');

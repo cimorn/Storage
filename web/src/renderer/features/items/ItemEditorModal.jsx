@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getItemVariants, getVariantQuantity, MAX_ITEM_VARIANTS, withVariantSummary } from '../../../../shared/item-variants.mjs';
-import { getItemImageIds, MAX_ITEM_IMAGES, withImageSummary } from '../../../../shared/item-images.mjs';
+import { getItemImageIds, MAX_ITEM_IMAGES, withImageSummary, orderImagesByVariants } from '../../../../shared/item-images.mjs';
 
 import {
   buildNodePath,
@@ -161,10 +161,13 @@ export default function ItemEditorModal({
   );
   const level1Options = useMemo(() => getChildEntries(locations, null), [locations]);
   const assignedLocationIds = [...new Set(draft.locationIds.filter(Boolean))];
-  const imageOptions = [
+  const availableImageOptions = [
     ...draft.imagePaths.map((id, index) => ({ id, savedId: id, label: `图片${index + 1}` })),
     ...pendingImages.map(row => ({ id: `pending:${row.key}`, url: row.url, label: row.file.name }))
   ];
+  const imageOptionById = new Map(availableImageOptions.map(option => [option.id, option]));
+  const imageOrder = orderImagesByVariants(availableImageOptions.map(option => option.id), draft.variants);
+  const imageOptions = imageOrder.map(id => imageOptionById.get(id));
   const inheritedPrivate = isItemPrivate(
     { ...draft, locationIds: assignedLocationIds, isPrivate: false },
     { categories, locations }
@@ -201,6 +204,17 @@ export default function ItemEditorModal({
   function removeVariant(rowKey) {
     if (draft.variants.length <= 1) return;
     updateDraft({ variants: draft.variants.filter(row => row.rowKey !== rowKey) });
+  }
+
+  function reorderVariant(sourceKey, targetKey, position) {
+    if (saving) return;
+    const source = draft.variants.find(row => String(row.rowKey) === String(sourceKey));
+    if (!source || String(sourceKey) === String(targetKey)) return;
+    const rows = draft.variants.filter(row => row !== source);
+    const targetIndex = rows.findIndex(row => String(row.rowKey) === String(targetKey));
+    if (targetIndex < 0) return;
+    rows.splice(targetIndex + (position === 'after' ? 1 : 0), 0, source);
+    updateDraft({ variants: rows });
   }
 
   function handleTabKeyDown(event) {
@@ -397,8 +411,8 @@ export default function ItemEditorModal({
           imagePaths.push(uploadedId);
           imageMap.set(`pending:${row.key}`, uploadedId);
         }
-        Object.assign(nextItem, withImageSummary({ imagePaths }));
         nextItem.variants = nextItem.variants.map(row => ({ ...row, imageId: row.imageId ? imageMap.get(row.imageId) : '' }));
+        Object.assign(nextItem, withImageSummary({ imagePaths: orderImagesByVariants(imagePaths, nextItem.variants) }));
       }
       if (!isCurrentSave()) return;
       nextItem.variants = getItemVariants(nextItem);
@@ -458,7 +472,7 @@ export default function ItemEditorModal({
           ) : null}
           <div className="item-editor-modal__edit-panel" role="tabpanel" id="item-editor-edit-panel" aria-labelledby="item-editor-edit-tab" hidden={activeTab !== 'edit'}>
           <section className="item-editor-modal__media">
-            <ItemImageEditor imageIds={draft.imagePaths} pendingImages={pendingImages} saving={saving}
+            <ItemImageEditor imageIds={draft.imagePaths} pendingImages={pendingImages} imageOrder={imageOrder} saving={saving}
               onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} />
             {canManagePrivacy ? <div className="item-editor-modal__media-actions">
               <label className="web-item-option-control">
@@ -479,7 +493,7 @@ export default function ItemEditorModal({
               </label>
             </div>
 
-            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS}
+            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS} onReorder={reorderVariant}
               onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} />
 
             <div className="form-row form-row--2 item-editor-modal__paired-row">

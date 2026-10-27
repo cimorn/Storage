@@ -10,7 +10,7 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
   const imageIndex = Math.max(0, imageIds.indexOf(selectedImageId));
   const currentImageId = imageIds[imageIndex] || '';
   const currentVariant = currentImageId ? getItemVariants(item).find(row => row.imageId === currentImageId) : null;
-  const currentSpecification = currentVariant ? formatItemVariants({ variants: [currentVariant] }) : item.note;
+  const currentSpecification = item.note ?? formatItemVariants(item);
   const gestureRef = useRef(null);
   const suppressClickRef = useRef(false);
   const { url: imageSrc, status: imageStatus } = useImagePreviewState(currentImageId, imageIndex === 0 ? item.imageSrc : '', { targetRef: imageTargetRef });
@@ -87,10 +87,11 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
       <div className="item-gallery-card__content">
         <div className="item-gallery-card__title-row">
           <strong>{item.title}</strong>
+          {item.brand ? <span className="item-gallery-card__brand">{item.brand}</span> : null}
         </div>
         <div className="item-gallery-card__variant-row">{currentSpecification}</div>
         <div className="item-gallery-card__meta-row">
-          <span className="item-gallery-card__meta-text">{item.metaLine || '未填写品牌或款式'}</span>
+          <span className="item-gallery-card__meta-text">{item.metaLine || '未填写款式'}</span>
           {hasItemPackaging(item) ? (
             <svg className="item-gallery-card__packaging" role="img" aria-label="有包装" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" focusable="false">
               <title>有包装</title>
