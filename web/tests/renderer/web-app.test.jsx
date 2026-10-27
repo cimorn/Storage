@@ -212,7 +212,7 @@ describe('password gated browser inventory', () => {
     await user.click(screen.getByRole('button', { name: '隐藏物品' }));
     expect(within(screen.getByRole('dialog')).getByLabelText('隐私区')).toBeChecked();
     await user.type(within(screen.getByRole('dialog')).getByLabelText('颜色1'), '秘密草稿');
-    await user.click(within(screen.getByRole('dialog')).getByRole('tab', { name: '信息页' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('tab', { name: '信息' }));
     expect(within(screen.getByRole('table')).getByRole('cell', { name: '秘密草稿' })).toBeInTheDocument();
     act(() => useProjectStore.getState().setSearch('隐藏'));
     await user.click(screen.getByRole('button', { name: '物品管理', exact: true }));

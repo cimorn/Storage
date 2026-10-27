@@ -90,15 +90,15 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
           {item.brand ? <span className="item-gallery-card__brand">{item.brand}</span> : null}
         </div>
         <div className="item-gallery-card__variant-row">{currentSpecification}</div>
-        <div className="item-gallery-card__meta-row">
-          <span className="item-gallery-card__meta-text">{item.metaLine || '未填写款式'}</span>
+        {item.metaLine || hasItemPackaging(item) ? <div className="item-gallery-card__meta-row">
+          {item.metaLine ? <span className="item-gallery-card__meta-text">{item.metaLine}</span> : null}
           {hasItemPackaging(item) ? (
             <svg className="item-gallery-card__packaging" role="img" aria-label="有包装" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" focusable="false">
               <title>有包装</title>
               <path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7.5 5l9 4" />
             </svg>
           ) : null}
-        </div>
+        </div> : null}
       </div>
     </button>
   );

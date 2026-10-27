@@ -1,6 +1,7 @@
+import { addVariant, openVariantManagement } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import ItemEditorModal from '../../src/renderer/features/items/ItemEditorModal';
 import ItemGalleryCard from '../../src/renderer/features/items/ItemGalleryCard';
@@ -24,6 +25,7 @@ const locations = [
   { id: 'secret', name: '私人柜', level: 1, parentId: null, isPrivate: true }
 ];
 const item = { id: 'item', name: '书', categoryId: 'public', locationId: 'box', tags: [] };
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 function editor(initialItem = item, extra = {}) {
@@ -90,8 +92,9 @@ describe('compact NAS item controls', () => {
     expect(packaging).toHaveAttribute('title', '有包装');
     expect(remove).toHaveTextContent('×');
     expect(remove).toHaveAttribute('title', '移除颜色和尺码');
+    await openVariantManagement(user);
     const add = screen.getByRole('button', { name: '添加颜色' });
-    expect(add).toHaveTextContent('＋');
+    expect(add).toHaveTextContent('添加');
     expect(add).toHaveAttribute('title', '添加颜色和尺码');
     await user.click(add);
     expect(screen.getByRole('group', { name: '规格2' })).toBeInTheDocument();
@@ -103,17 +106,17 @@ describe('compact NAS item controls', () => {
 
   it('keeps the current category and every ordered location in the header above the table', async () => {
     const { user, container } = editor({ ...item, categoryId: 'child', locationIds: ['other', 'box'] });
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('tab', { name: '信息' }));
     const header=within(container.querySelector('.item-editor-modal__header'));
-    const category=header.getByText('日常 / 子类');
-    expect(header.getByText('另一个房间；房间 / 柜子 / 盒子')).toBeInTheDocument();
-    const panel=screen.getByRole('tabpanel', { name: '信息页' });
+    const category=header.getByText('日常/子类');
+    expect(header.getByText('另一个房间；房间/柜子/盒子')).toBeInTheDocument();
+    const panel=screen.getByRole('tabpanel', { name: '信息' });
     const table=within(panel).getByRole('table');
     expect(category.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(panel).queryByText('分类')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: '编辑页' }));
+    await user.click(screen.getByRole('tab', { name: '编辑' }));
     await user.selectOptions(screen.getByLabelText('子分类'), '');
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    await user.click(screen.getByRole('tab', { name: '信息' }));
     expect(header.getByText('日常')).toBeInTheDocument();
   });
 
@@ -133,10 +136,10 @@ describe('compact NAS item controls', () => {
     expect(screen.getByRole('button', { name: '移除规格1' })).toBeDisabled();
     await user.type(screen.getByLabelText('颜色1'), '白色');
     await user.type(screen.getByLabelText('尺码1'), 'S');
-    await user.click(screen.getByRole('button', { name: '添加颜色' }));
+    await addVariant(user);
     await user.type(screen.getByLabelText('颜色2'), '黑色');
     await user.type(screen.getByLabelText('尺码2'), 'M');
-    await user.click(screen.getByRole('button', { name: '添加颜色' }));
+    await addVariant(user);
     await user.type(screen.getByLabelText('颜色3'), '蓝色');
     await user.type(screen.getByLabelText('尺码3'), 'L');
     await user.click(screen.getByLabelText('包装3'));
@@ -158,17 +161,17 @@ describe('compact NAS item controls', () => {
     await user.type(screen.getByLabelText('颜色1'), '奶油白');
     await user.type(screen.getByLabelText('尺码1'), 'S');
     await user.click(screen.getByLabelText('包装1'));
-    await user.click(screen.getByRole('button', { name: '添加颜色' }));
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
-    expect(screen.getByRole('tab', { name: '信息页' })).toHaveAttribute('aria-selected', 'true');
-    const panel = screen.getByRole('tabpanel', { name: '信息页' });
+    await addVariant(user);
+    await user.click(screen.getByRole('tab', { name: '信息' }));
+    expect(screen.getByRole('tab', { name: '信息' })).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel', { name: '信息' });
     const table = within(panel).getByRole('table');
     expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['图片', '颜色', '尺码', '数量', '包装']);
     expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual(['—奶油白S1有', '———1无']);
     expect(within(panel).queryByRole('textbox')).not.toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.keyboard('{ArrowLeft}');
-    expect(screen.getByRole('tab', { name: '编辑页' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: '编辑' })).toHaveFocus();
     expect(screen.getByLabelText('颜色1')).toHaveValue('奶油白');
     expect(screen.getByLabelText('尺码1')).toHaveValue('S');
     expect(screen.getByText('共2件')).toBeInTheDocument();
@@ -195,7 +198,7 @@ describe('compact NAS item controls', () => {
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('请按实际件数添加规格后再保存');
     expect(onSave).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: '添加颜色' }));
+    await addVariant(user);
     expect(screen.getByText('共1件')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ notes: '', variants: [{ color: '', size: '', isPackaged: false, quantity: 1, imageId: '' }] }));
@@ -252,7 +255,7 @@ describe('item inherited privacy', () => {
     const { user, onSave } = editor({ ...item, categoryId });
     expect(screen.getByRole('checkbox', { name: '隐私区' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: '隐私区' })).toBeDisabled();
-    expect(screen.getByText('所选分类或位置属于隐私区')).toBeInTheDocument();
+    expect(screen.queryByText('所选分类或位置属于隐私区')).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('主分类'), 'public');
     expect(screen.getByRole('checkbox', { name: '隐私区' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: '隐私区' })).toBeEnabled();

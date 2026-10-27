@@ -14,19 +14,19 @@ it('shows category, every location and the draft total beside the title across t
   const user = userEvent.setup();
   const {container} = render(<ItemEditorModal open item={item} categories={categories} locations={locations} canManagePrivacy={false} />);
   const header = within(container.querySelector('.item-editor-modal__header'));
-  expect(header.getByText('数码 / 存储')).toBeInTheDocument();
-  expect(header.getByText('325 / 桌下 / NAS；备用')).toBeInTheDocument();
+  expect(header.getByText('数码/存储')).toBeInTheDocument();
+  expect(header.getByText('325/桌下/NAS；备用')).toBeInTheDocument();
   expect(header.getByText('共2件')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('数量1'), {target:{value:'4'}});
-  await user.click(screen.getByRole('tab',{name:'信息页',exact:true}));
+  await user.click(screen.getByRole('tab',{name:'信息',exact:true}));
   expect(header.getByText('共4件')).toBeInTheDocument();
-  const panel=within(screen.getByRole('tabpanel',{name:'信息页',exact:true}));
+  const panel=within(screen.getByRole('tabpanel',{name:'信息',exact:true}));
   expect(panel.queryByText('分类')).not.toBeInTheDocument();
   expect(panel.queryByText('位置')).not.toBeInTheDocument();
   expect(panel.queryByText('共4件')).not.toBeInTheDocument();
   expect(panel.getByRole('table')).toBeInTheDocument();
   await user.click(screen.getByRole('tab',{name:'标签',exact:true}));
-  expect(header.getByText('数码 / 存储')).toBeVisible();
+  expect(header.getByText('数码/存储')).toBeVisible();
 });
 it('passes the already displayed thumbnail to preview rather than waiting for another lookup', async () => {
   const onPreview=vi.fn();

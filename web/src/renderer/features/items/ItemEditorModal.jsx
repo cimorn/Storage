@@ -213,7 +213,8 @@ export default function ItemEditorModal({
   }
 
   function removeVariant(rowKey) {
-    if (draft.variants.length <= 1) return;
+    if (saving || draft.variants.length <= 1) return;
+    if (!window.confirm('确定删除这条规格及对应图片吗？')) return;
     const imageId = draft.variants.find(row => row.rowKey === rowKey)?.imageId;
     if (imageId) removeImage(imageId);
     setDraft(current => ({ ...current, variants: current.variants.filter(row => row.rowKey !== rowKey) }));
@@ -300,6 +301,11 @@ export default function ItemEditorModal({
     setPreviewImage(null);
     if (imageId.startsWith('pending:')) removePendingImage(Number(imageId.slice(8)));
     else removeSavedImage(imageId);
+  }
+
+  function requestRemoveImage(imageId) {
+    if (saving || !window.confirm('确定删除这张图片吗？')) return;
+    removeImage(imageId);
   }
 
   function previewPhoto(image) {
@@ -487,8 +493,8 @@ export default function ItemEditorModal({
             <h2 id="item-editor-title">{mode === 'copy' ? '复制新增' : mode === 'create' ? '新增物品' : draft.name || '未命名物品'}</h2>
           </div>
           <dl className="item-editor-summary" aria-label="物品分类和位置" tabIndex={0}>
-            <div><dt>分类</dt><dd>{categoryPath || '未选'}</dd></div>
-            <div><dt>位置</dt><dd>{locationPaths.join('；') || '未选'}</dd></div>
+            <div><dt className="item-editor-summary__label">分类</dt><dd>{categoryPath.replace(/\s*\/\s*/g, '/') || '未选'}</dd></div>
+            <div><dt className="item-editor-summary__label">位置</dt><dd>{locationPaths.join('；').replace(/\s*\/\s*/g, '/') || '未选'}</dd></div>
           </dl>
           <p className="item-editor-modal__count" aria-live="polite">{totalQuantity === null ? '请检查数量' : `共${totalQuantity}件`}</p>
           <button className="ghost-button" type="button" onClick={requestClose} disabled={saving} aria-label="关闭物品弹窗">
@@ -498,10 +504,15 @@ export default function ItemEditorModal({
 
         <div className="item-editor-modal__toolbar">
           <div className="item-editor-modal__tabs" role="tablist" aria-label="物品页面" ref={tabsRef} onKeyDown={handleTabKeyDown}>
-            <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑页</button>
-            <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息页</button>
+            <button type="button" role="tab" id="item-editor-edit-tab" aria-controls="item-editor-edit-panel" aria-selected={activeTab === 'edit'} tabIndex={activeTab === 'edit' ? 0 : -1} onClick={() => setActiveTab('edit')}>编辑</button>
+            <button type="button" role="tab" id="item-editor-information-tab" aria-controls="item-editor-information-panel" aria-selected={activeTab === 'information'} tabIndex={activeTab === 'information' ? 0 : -1} onClick={() => setActiveTab('information')}>信息</button>
             <button type="button" role="tab" id="item-editor-tags-tab" aria-controls="item-editor-tags-panel" aria-selected={activeTab === 'tags'} tabIndex={activeTab === 'tags' ? 0 : -1} onClick={() => setActiveTab('tags')}>标签</button>
           </div>
+          {canManagePrivacy ? <label className="web-item-option-control item-editor-modal__privacy">
+            <input type="checkbox" checked={draft.isPrivate || inheritedPrivate} disabled={saving || inheritedPrivate}
+              onChange={event => updateDraft({ isPrivate: event.target.checked })} />
+            <span>隐私区</span>
+          </label> : null}
           <input hidden ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="从相册选择图片" disabled={saving} onChange={handleBrowserFile} />
         </div>
 
@@ -514,16 +525,7 @@ export default function ItemEditorModal({
           <div className="item-editor-modal__edit-panel" role="tabpanel" id="item-editor-edit-panel" aria-labelledby="item-editor-edit-tab" hidden={activeTab !== 'edit'}>
           <section className="item-editor-modal__media">
             {unassignedSavedImages.length || unassignedPendingImages.length ? <ItemImageEditor imageIds={unassignedSavedImages} pendingImages={unassignedPendingImages} imageOrder={imageOrder} saving={saving}
-              onRemoveSaved={removeSavedImage} onRemovePending={removePendingImage} onPreview={previewPhoto} /> : null}
-            {canManagePrivacy ? <div className="item-editor-modal__media-actions">
-              <label className="web-item-option-control">
-                <input type="checkbox" checked={draft.isPrivate || inheritedPrivate} disabled={saving || inheritedPrivate}
-                  aria-describedby={inheritedPrivate ? 'item-privacy-inheritance' : undefined}
-                  onChange={event => updateDraft({ isPrivate: event.target.checked })} />
-                <span>隐私区</span>
-              </label>
-              {inheritedPrivate ? <p id="item-privacy-inheritance" className="privacy-inheritance-hint">所选分类或位置属于隐私区</p> : null}
-            </div> : null}
+              onRemoveSaved={requestRemoveImage} onRemovePending={key => requestRemoveImage(`pending:${key}`)} onPreview={previewPhoto} /> : null}
           </section>
 
           <fieldset className="item-editor-modal__form" disabled={saving}>
@@ -538,8 +540,8 @@ export default function ItemEditorModal({
               </label>
             </div>
 
-            <ItemVariantFields variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS} onReorder={reorderVariant}
-              onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} onUpload={chooseVariantImage} onRemoveImage={removeImage} onPreview={previewPhoto} />
+            <ItemVariantFields key={`${mode}:${item?.id || 'new'}`} variants={draft.variants} imageOptions={imageOptions} maxVariants={MAX_ITEM_VARIANTS} onReorder={reorderVariant}
+              onChange={updateVariant} onAdd={addVariant} onRemove={removeVariant} onUpload={chooseVariantImage} onRemoveImage={requestRemoveImage} onPreview={previewPhoto} />
 
             <div className="form-row">
               <label className="field">

@@ -1,3 +1,4 @@
+import { startVariantSort, showVariantInputs } from '../helpers/upload-variant-photo';
 import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -34,8 +35,10 @@ describe('size groups and specification ordering',()=>{
   });
   it('moves a specification with the keyboard and makes its associated image the cover on Save',async()=>{
     const{user,onSave,api}=setup();
+    await startVariantSort(user);
     screen.getByRole('button',{name:'拖动规格2',exact:true}).focus();
     await user.keyboard('{ArrowUp}');
+    await showVariantInputs(user);
     expect(screen.getByLabelText('颜色1')).toHaveValue('白');
     await user.click(screen.getByRole('button',{name:'保存',exact:true}));
     await waitFor(()=>expect(onSave).toHaveBeenCalled());
@@ -44,11 +47,13 @@ describe('size groups and specification ordering',()=>{
   });
   it('supports a pointer drag before another row without changing quantities',async()=>{
     const{user,onSave}=setup();
+    await startVariantSort(user);
     const handle=screen.getByRole('button',{name:'拖动规格2',exact:true}),target=screen.getByRole('group',{name:'规格1',exact:true});
     Object.defineProperty(document,'elementFromPoint',{configurable:true,value:vi.fn(()=>target)});
     vi.spyOn(target,'getBoundingClientRect').mockReturnValue({top:100,height:32});
     const dispatch=(type,y)=>{const event=new Event(type,{bubbles:true,cancelable:true});Object.assign(event,{pointerId:1,button:0,isPrimary:true,clientX:20,clientY:y});fireEvent(handle,event);};
     await act(async()=>{dispatch('pointerdown',200);dispatch('pointermove',90);dispatch('pointerup',90);});
+    await showVariantInputs(user);
     expect(screen.getByLabelText('颜色1')).toHaveValue('白');
     await user.click(screen.getByRole('button',{name:'保存',exact:true}));
     await waitFor(()=>expect(onSave).toHaveBeenCalled());
@@ -57,8 +62,10 @@ describe('size groups and specification ordering',()=>{
   it('previews a pending photo as cover after its specification moves first and saves the real uploaded ID',async()=>{
     const{user,onSave,container}=setup();
     await uploadVariantPhotos(user, new File(['new'],'new.png',{type:'image/png'}));
+    await startVariantSort(user);
     screen.getByRole('button',{name:'拖动规格3',exact:true}).focus();
     await user.keyboard('{ArrowUp}{ArrowUp}');
+    await showVariantInputs(user);
     expect(screen.getByRole('group',{name:'规格1',exact:true}).querySelector('img')).toHaveAttribute('alt','待上传图片1：new.png');
     await user.click(screen.getByRole('button',{name:'保存',exact:true}));
     await waitFor(()=>expect(onSave).toHaveBeenCalled());

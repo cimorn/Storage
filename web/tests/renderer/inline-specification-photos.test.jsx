@@ -1,6 +1,7 @@
+import { startVariantSort, showVariantInputs } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import ItemEditorModal from '../../src/renderer/features/items/ItemEditorModal';
 import ItemGalleryCard from '../../src/renderer/features/items/ItemGalleryCard';
 import { buildItemCardView } from '../../src/renderer/features/items/item-gallery-selectors';
@@ -17,6 +18,7 @@ function setup(overrides = {}) {
   const view = render(<ImageAccessProvider api={api}><ItemEditorModal open item={item} categories={[{ id: 'cat', name: '服装' }]} canManagePrivacy={false} onSave={onSave} /></ImageAccessProvider>);
   return { ...view, api, onSave, user: userEvent.setup() };
 }
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe('inline specification photos', () => {
   it('uploads to the clicked row even when an earlier row is unbound, replacing only that row photo on Save', async () => {
@@ -33,9 +35,11 @@ describe('inline specification photos', () => {
   it('keeps the upload target stable while rows are reordered and removes the image with its row', async () => {
     const { user, api, onSave } = setup();
     await user.click(screen.getByRole('button', { name: '上传规格2图片' }));
+    await startVariantSort(user);
     screen.getByRole('button', { name: '拖动规格2' }).focus();
     await user.keyboard('{ArrowUp}');
     await user.upload(screen.getByLabelText('从相册选择图片'), new File(['new'], 'new.png', { type: 'image/png' }));
+    await showVariantInputs(user);
     expect(screen.getByLabelText('颜色1')).toHaveValue('红');
     await user.click(screen.getByRole('button', { name: '移除规格1', exact: true }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
@@ -51,11 +55,11 @@ describe('inline specification photos', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: '图片预览' })).not.toBeInTheDocument();
     expect(thumbnail).toHaveFocus();
-    await user.click(screen.getByRole('tab', { name: '信息页', exact: true }));
+    await user.click(screen.getByRole('tab', { name: '信息', exact: true }));
     await user.click(screen.getByRole('button', { name: '放大规格2图片' }));
     expect(screen.getByRole('dialog', { name: '图片预览' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '关闭图片预览' }));
-    screen.getByRole('tab', { name: '信息页', exact: true }).focus();
+    screen.getByRole('tab', { name: '信息', exact: true }).focus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: '标签', exact: true })).toHaveAttribute('aria-selected', 'true');
     await user.type(screen.getByLabelText('新增标签'), 'TEST');

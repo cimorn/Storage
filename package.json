@@ -1,6 +1,6 @@
 {
   "name": "itemmanager-workspace",
-  "version": "26.5.2",
+  "version": "26.6.0",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",
