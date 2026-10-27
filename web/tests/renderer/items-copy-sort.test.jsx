@@ -136,7 +136,7 @@ describe('copy a saved item into a new draft', () => {
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
     expect(access.current.copy).toHaveBeenCalledExactlyOnceWith('original-image');
     expect(access.current.upload).toHaveBeenCalledExactlyOnceWith(file);
-    expect(onCreateItem.mock.calls[0][0]).toMatchObject({ imagePath: 'independent-image', imagePaths: ['independent-image', 'replacement-image'] });
+    expect(onCreateItem.mock.calls[0][0]).toMatchObject({ imagePath: 'replacement-image', imagePaths: ['replacement-image', 'independent-image'] });
   });
 
   it('copies every saved image in order and reuses partial successes on retry', async () => {

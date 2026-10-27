@@ -63,10 +63,10 @@ describe('applyItemGalleryFilters', () => {
 describe('card quantity display', () => {
   it.each(['1', 1, ' 1 '])('hides a single item (%j) without changing its saved quantity', quantity => {
     const card = buildItemCardView({ name: 'T恤', brand: '品牌', specification: '印花·镂空', quantity });
-    expect(card.metaLine).toBe('品牌 · 印花·镂空');
+    expect(card.metaLine).toBe('印花·镂空');
     expect(card.quantity).toBe(quantity);
   });
   it.each(['2', '12', '1件', ''])('keeps quantity out of the brand/style line (%j)', quantity => {
-    expect(buildItemCardView({ brand: '品牌', quantity }).metaLine).toBe('品牌');
+    expect(buildItemCardView({ brand: '品牌', quantity }).metaLine).toBe('');
   });
 });

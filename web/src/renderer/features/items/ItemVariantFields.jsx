@@ -1,12 +1,14 @@
 import { getVariantQuantity, MAX_VARIANT_QUANTITY } from '../../../../shared/item-variants.mjs';
 import VariantImagePicker from './VariantImagePicker';
+import useVariantDrag from './useVariantDrag';
 
-export default function ItemVariantFields({ variants, imageOptions = [], maxVariants, onChange, onAdd, onRemove }) {
+export default function ItemVariantFields({ variants, imageOptions = [], maxVariants, onChange, onAdd, onRemove, onReorder }) {
+  const { rootRef, drag, handleProps } = useVariantDrag(variants, onReorder);
   let count;
   try { count = variants.reduce((total, row) => total + getVariantQuantity(row), 0); } catch { count = null; }
   const assignedImages = new Set(variants.map(row => row.imageId).filter(Boolean));
   return (
-    <section className="item-variant-editor" aria-label="物品规格">
+    <section className="item-variant-editor" aria-label="物品规格" ref={rootRef}>
       <div className="item-variant-editor__heading">
         <strong>规格</strong>
         <div className="item-variant-editor__heading-actions">
@@ -15,7 +17,8 @@ export default function ItemVariantFields({ variants, imageOptions = [], maxVari
         </div>
       </div>
       {variants.map((row, index) => (
-        <div className="item-variant-editor__row" role="group" aria-label={`规格${index + 1}`} key={row.rowKey}>
+        <div className={`item-variant-editor__row${drag?.targetKey === String(row.rowKey) ? ` is-drop-${drag.position}` : ''}`} data-variant-row={row.rowKey} role="group" aria-label={`规格${index + 1}`} key={row.rowKey}>
+          <button className="item-variant-editor__drag" type="button" aria-label={`拖动规格${index + 1}`} title="拖动排序，也可用上下方向键" {...handleProps(row)}>⠿</button>
           <VariantImagePicker value={row.imageId || ''} index={index} options={imageOptions} assignedImages={assignedImages} onChange={imageId => onChange(row.rowKey, { imageId })} />
           <input className="item-variant-editor__color" aria-label={`颜色${index + 1}`} title="颜色" placeholder="颜色" maxLength={128} value={row.color} onChange={event => onChange(row.rowKey, { color: event.target.value })} />
           <input className="item-variant-editor__size" aria-label={`尺码${index + 1}`} title="尺码" placeholder="尺码" maxLength={128} value={row.size} onChange={event => onChange(row.rowKey, { size: event.target.value })} />

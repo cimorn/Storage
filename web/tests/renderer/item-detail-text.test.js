@@ -12,7 +12,7 @@ describe('specification and style separators', () => {
     const card = buildItemCardView(item);
     expect(card.title).toBe('T 恤');
     expect(card.note).toBe('白色·S');
-    expect(card.metaLine).toBe('Some Brand · 印花·镂空');
+    expect(card.metaLine).toBe('印花·镂空');
     expect(card.notes).toBe('白色 S');
     expect(card.specification).toBe('印花　镂空');
     expect(item.notes).toBe('白色 S');

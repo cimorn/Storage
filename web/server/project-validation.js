@@ -1,7 +1,7 @@
 'use strict';
 const {StorageError}=require('./errors');
 const {normalizeVariantRows,getItemVariants,withVariantSummary}=require('../shared/item-variants.mjs');
-const {getItemImageIds}=require('../shared/item-images.mjs');
+const {getItemImageIds,orderImagesByVariants}=require('../shared/item-images.mjs');
 const ITEM_FIELDS=['barcode','code','name','brand','quantity','specification','notes'];
 const META_FIELDS=['name','createdAt','updatedAt','appVersion'];
 const ID=/^[A-Za-z0-9_-]{1,128}$/;
@@ -68,6 +68,9 @@ function validateProject(input,{allowImagePaths=false}={}){
     if(item.variants){
       item.variants=getItemVariants(item);
       if(item.variants.some(row=>row.imageId&&!imageIds.includes(row.imageId)))throw new StorageError('INVALID_IMAGE');
+      imageIds=orderImagesByVariants(imageIds,item.variants);
+      item.imagePath=imageIds[0]||'';
+      if(Object.hasOwn(value,'imagePaths'))item.imagePaths=imageIds;
     }
     item.categoryPath=categoryLineage(item.categoryId).map(x=>x.name).join(' / ');
     item.locationPath=locationLineage(item.locationId).map(x=>x.name).join(' / ');

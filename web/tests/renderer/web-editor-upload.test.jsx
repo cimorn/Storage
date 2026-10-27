@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -84,12 +84,12 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.getByLabelText('从相册选择图片')).toHaveAttribute('multiple');
     await selectPhoto(user, 'third.png');
     expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(5);
-    await user.click(screen.getByRole('button', { name: '移除图片 1' }));
-    await user.click(screen.getByRole('button', { name: '移除图片 3' }));
+    await user.click(within(screen.getByRole('img', { name: '已保存图片2' }).closest('.web-item-image-thumbnail')).getByRole('button'));
+    await user.click(within(screen.getByRole('img', { name: '待上传图片2：second.jpg' }).closest('.web-item-image-thumbnail')).getByRole('button'));
     expect(URL.revokeObjectURL).toHaveBeenCalled();
     expect(api.uploadImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'detail', imagePaths: ['detail', 'first-upload', 'third-upload'] })));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'first-upload', imagePaths: ['first-upload', 'detail', 'third-upload'] })));
     expect(api.uploadImage).toHaveBeenCalledTimes(2);
     expect(onSave.mock.calls[0][0].imagePaths.every(id => typeof id === 'string')).toBe(true);
   });
