@@ -41,8 +41,8 @@ describe('ItemsGalleryPage location filters', () => {
     expect(level1Select).toBeInTheDocument();
     expect(level1Select.selectedOptions[0].textContent).toBe('位置');
     expect(within(level1Select).getByRole('option', { name: '位置' })).toBeInTheDocument();
-    expect(screen.getByLabelText('二级位置筛选').selectedOptions[0].textContent).toBe('二级位置');
-    expect(screen.getByLabelText('三级位置筛选').selectedOptions[0].textContent).toBe('三级位置');
+    expect(screen.getByLabelText('二级位置筛选').selectedOptions[0].textContent).toBe('二级');
+    expect(screen.getByLabelText('三级位置筛选').selectedOptions[0].textContent).toBe('三级');
     expect(container.querySelectorAll('.item-location-filter__field span')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: '存储' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '设备' })).not.toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('ItemsGalleryPage location filters', () => {
     );
 
     const level2Select = screen.getByLabelText('二级位置筛选');
-    expect(level2Select.selectedOptions[0].textContent).toBe('二级位置');
+    expect(level2Select.selectedOptions[0].textContent).toBe('二级');
     expect(within(level2Select).getByRole('option', { name: '全部' })).toBeInTheDocument();
 
     await user.selectOptions(level2Select, 'loc_desk');
@@ -82,7 +82,7 @@ describe('ItemsGalleryPage location filters', () => {
     );
 
     const level3Select = screen.getByLabelText('三级位置筛选');
-    expect(level3Select.selectedOptions[0].textContent).toBe('三级位置');
+    expect(level3Select.selectedOptions[0].textContent).toBe('三级');
     expect(within(level3Select).getByRole('option', { name: '全部' })).toBeInTheDocument();
 
     await user.selectOptions(level3Select, 'loc_box');

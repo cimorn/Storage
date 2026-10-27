@@ -164,6 +164,12 @@ function createImageAccess(api, options) {
       if (!active) throw new Error('当前编辑已关闭');
       return result;
     },
+    async readFull(imageId, { signal } = {}) {
+      if (!active) throw new Error('当前图片访问已关闭');
+      const result = await api.readImage(imageId, { signal });
+      if (!active) throw new Error('当前图片访问已关闭');
+      return result;
+    },
     dispose() {
       active = false;
       capacityListeners.clear();

@@ -80,7 +80,7 @@ export default function ItemGalleryCard({ item, bulkMode = false, bulkSelected =
             {imageStatus === 'none' ? '无图' : imageStatus === 'error' ? '图片加载失败' : '图片加载中…'}
           </div>
         )}
-        {currentVariant ? <span className="item-gallery-card__quantity" aria-label={`当前规格数量${getVariantQuantity(currentVariant)}`} aria-live="polite">{getVariantQuantity(currentVariant)}</span> : null}
+        {currentVariant && getVariantQuantity(currentVariant) > 1 ? <span className="item-gallery-card__quantity" aria-label={`当前规格数量${getVariantQuantity(currentVariant)}`} aria-live="polite">{getVariantQuantity(currentVariant)}</span> : null}
         {imageIds.length > 1 ? <span className="item-gallery-card__image-count" aria-live="polite" aria-label={`第${imageIndex + 1}张，共${imageIds.length}张`}>{imageIndex + 1}/{imageIds.length}</span> : null}
       </div>
 

@@ -1,3 +1,4 @@
+import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -49,7 +50,7 @@ function setup({ onSave = vi.fn(), onClose = vi.fn(), initialItem = item, api: o
 
 async function selectPhoto(user, name = '相册照片.png') {
   const file = new File(['photo'], name, { type: 'image/png' });
-  await user.upload(screen.getByLabelText('从相册选择图片'), file);
+  await uploadVariantPhotos(user, file);
   return file;
 }
 
@@ -80,16 +81,16 @@ describe('NAS editor deferred image upload', () => {
     const { api, onSave } = setup({ initialItem: { ...item, imagePath: 'cover', imagePaths: ['cover', 'detail'] }, api: { uploadImage: vi.fn().mockResolvedValueOnce({ imageId: 'first-upload' }).mockResolvedValueOnce({ imageId: 'third-upload' }) } });
     const first = new File(['first'], 'first.png', { type: 'image/png' });
     const second = new File(['second'], 'second.jpg', { type: 'image/jpeg' });
-    await user.upload(screen.getByLabelText('从相册选择图片'), [first, second]);
-    expect(screen.getByLabelText('从相册选择图片')).toHaveAttribute('multiple');
+    await uploadVariantPhotos(user, [first, second]);
+    expect(screen.getByLabelText('从相册选择图片')).not.toHaveAttribute('multiple');
     await selectPhoto(user, 'third.png');
     expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(5);
-    await user.click(within(screen.getByRole('img', { name: '已保存图片2' }).closest('.web-item-image-thumbnail')).getByRole('button'));
-    await user.click(within(screen.getByRole('img', { name: '待上传图片2：second.jpg' }).closest('.web-item-image-thumbnail')).getByRole('button'));
+    await user.click(within(screen.getByRole('img', { name: '已保存图片5' }).closest('.web-item-image-thumbnail')).getByRole('button', { name: /^移除图片 / }));
+    await user.click(within(screen.getByRole('img', { name: '待上传图片2：second.jpg' }).closest('.item-variant-editor__row')).getByRole('button', { name: /^移除图片 / }));
     expect(URL.revokeObjectURL).toHaveBeenCalled();
     expect(api.uploadImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'first-upload', imagePaths: ['first-upload', 'detail', 'third-upload'] })));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'first-upload', imagePaths: ['first-upload', 'third-upload', 'cover'] })));
     expect(api.uploadImage).toHaveBeenCalledTimes(2);
     expect(onSave.mock.calls[0][0].imagePaths.every(id => typeof id === 'string')).toBe(true);
   });
@@ -108,12 +109,12 @@ describe('NAS editor deferred image upload', () => {
     const { api } = setup();
     const valid = new File(['photo'], 'valid.png', { type: 'image/png' });
     const invalid = new File(['text'], 'bad.txt', { type: 'text/plain' });
-    await user.upload(screen.getByLabelText('从相册选择图片'), [valid, invalid]);
+    await uploadVariantPhotos(user, invalid);
     expect(screen.getByRole('alert')).toHaveTextContent('图片格式');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     const large = new File(['photo'], 'large.png', { type: 'image/png' });
     Object.defineProperty(large, 'size', { value: 20 * 1024 * 1024 + 1 });
-    await user.upload(screen.getByLabelText('从相册选择图片'), [valid, large]);
+    await uploadVariantPhotos(user, large);
     expect(screen.getByRole('alert')).toHaveTextContent('20MB');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -122,10 +123,10 @@ describe('NAS editor deferred image upload', () => {
 
   it('rejects a whole batch above twenty total images while preserving existing selections', async () => {
     const user = userEvent.setup();
-    const { api } = setup({ initialItem: { ...item, imagePaths: Array.from({ length: 19 }, (_, index) => `saved-${index}`) } });
-    await user.upload(screen.getByLabelText('从相册选择图片'), [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
+    const { api } = setup({ initialItem: { ...item, imagePaths: Array.from({ length: 20 }, (_, index) => `saved-${index}`) } });
+    await uploadVariantPhotos(user, new File(['a'], 'a.png', { type: 'image/png' }));
     expect(screen.getByRole('alert')).toHaveTextContent('20');
-    expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(19);
+    expect(screen.getAllByRole('button', { name: /^移除图片 / })).toHaveLength(20);
     expect(api.uploadImage).not.toHaveBeenCalled();
   });
 
@@ -133,7 +134,7 @@ describe('NAS editor deferred image upload', () => {
     const user = userEvent.setup();
     const uploadImage = vi.fn().mockResolvedValueOnce({ imageId: 'first-id' }).mockRejectedValueOnce(new Error('第二张上传失败')).mockResolvedValueOnce({ imageId: 'second-id' });
     const { onSave } = setup({ api: { uploadImage } });
-    await user.upload(screen.getByLabelText('从相册选择图片'), [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
+    await uploadVariantPhotos(user, [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('第二张上传失败');
     expect(onSave).not.toHaveBeenCalled();
@@ -174,25 +175,21 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
     expect(api.uploadImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole('tab', { name: '编辑页' }));
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'staged-image', variants: [{ color: '蓝色', size: '', isPackaged: false, quantity: 1, imageId: 'staged-image' }] })));
   });
 
-  it('offers the image picker beside both tabs and keeps information-page selections local until Save', async () => {
+  it('keeps the photo in its row and shows it in information without uploading until Save', async () => {
     const user = userEvent.setup();
     const { api, onSave } = setup();
-    const picker = screen.getByRole('button', { name: '选择图片' });
-    const tabs = screen.getByRole('tablist', { name: '物品页面' });
-    expect(picker.closest('.item-editor-modal__toolbar')).toContainElement(tabs);
-    expect(tabs).not.toContainElement(picker);
-    await user.click(screen.getByRole('tab', { name: '信息页' }));
-    expect(picker).toBeVisible();
+    expect(screen.queryByRole('button', { name: '选择图片', exact: true })).not.toBeInTheDocument();
     await selectPhoto(user);
+    expect(screen.getByRole('button', { name: '上传规格1图片' }).closest('.item-variant-editor__row')).toContainElement(screen.getByRole('img'));
+    await user.click(screen.getByRole('tab', { name: '信息页' }));
+    expect(screen.getByRole('button', { name: '放大规格1图片' })).toBeVisible();
     expect(api.uploadImage).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('tab', { name: '编辑页' }));
-    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePaths: ['staged-image'] })));
   });
@@ -209,7 +206,7 @@ describe('NAS editor deferred image upload', () => {
     expect(screen.getByRole('cell', { name: '蓝色' })).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByRole('tab', { name: '编辑页' }));
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toHaveValue('蓝色');
   });
 
@@ -276,7 +273,7 @@ describe('NAS editor deferred image upload', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(await screen.findByText('上传断开')).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toHaveValue('保留这段草稿');
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ imagePath: 'retry-image', variants: [{ color: '保留这段草稿', size: '', isPackaged: false, quantity: 1, imageId: 'retry-image' }] })));
@@ -290,7 +287,7 @@ describe('NAS editor deferred image upload', () => {
     await selectPhoto(user);
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(await screen.findByText('保存断开')).toBeInTheDocument();
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     const ordinary = access.current.acquire('ordinary');
     await expect(ordinary.promise).resolves.toBe('blob:saved-image');
@@ -328,7 +325,7 @@ describe('NAS editor deferred image upload', () => {
 
     expect(screen.getByLabelText('名称')).toHaveValue('标签机');
     expect(screen.getByLabelText('颜色1')).toHaveValue('不能被项目刷新覆盖');
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '标签机', variants: [{ color: '不能被项目刷新覆盖', size: '', isPackaged: false, quantity: 1, imageId: 'staged-image' }], imagePath: 'staged-image' })));
     expect(api.uploadImage).toHaveBeenCalledTimes(1);
@@ -345,7 +342,7 @@ describe('NAS editor deferred image upload', () => {
     rerenderEditor({ item: { ...item }, categories: categories.map((category) => ({ ...category })), locations: [...locations] });
 
     expect(screen.getByLabelText('颜色1')).toHaveValue('上传时保留');
-    expect(screen.getByText('相册照片.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '待上传图片1：相册照片.png' })).toBeInTheDocument();
     expect(screen.getByLabelText('颜色1')).toBeDisabled();
     expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '取消' })).toBeDisabled();

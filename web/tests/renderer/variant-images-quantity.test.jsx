@@ -1,3 +1,4 @@
+import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -26,20 +27,18 @@ describe('variant photo and quantity editor', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0]).toMatchObject({ quantity: '3', variants: [{ quantity: 1, imageId: 'a' }, { quantity: 2, imageId: 'b' }] });
   });
-  it('disables photos assigned to another specification and permits releasing and reassigning one', async () => {
+  it('replaces a row photo directly without allowing manual association to another row', async () => {
     const { user, onSave } = setup();
-    await user.click(screen.getByRole('button', { name: '规格1图片', exact: true }));
-    expect(screen.getByRole('button', { name: '选择图片2', exact: true })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: '不关联图片', exact: true }));
-    await user.click(screen.getByRole('button', { name: '规格2图片', exact: true }));
-    await user.click(screen.getByRole('button', { name: '选择图片2', exact: true }));
+    await user.click(screen.getByRole('button', { name: '上传规格2图片' }));
+    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['new'], 'new.png', { type: 'image/png' }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0].variants.map(value => value.imageId)).toEqual(['', 'a']);
+    expect(onSave.mock.calls[0][0].variants.map(value => value.imageId)).toEqual(['a', 'uploaded']);
+    expect(onSave.mock.calls[0][0].imagePaths).toEqual(['a', 'uploaded']);
   });
   it('binds a locally cached first photo and substitutes its uploaded ID only when saving', async () => {
     const { user, api, onSave } = setup({ item: { ...base, imagePath: '', imagePaths: [], variants: [row()] } });
-    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['picture'], 'new.png', { type: 'image/png' }));
+    await uploadVariantPhotos(user, new File(['picture'], 'new.png', { type: 'image/png' }));
     expect(api.uploadImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
@@ -62,8 +61,7 @@ describe('variant photo and quantity editor', () => {
     const { user, api, onSave } = setup({ item: { ...base, imagePath: '', imagePaths: [], variants: [row()] } });
     api.uploadImage.mockResolvedValueOnce({ imageId: 'uploaded-a' }).mockResolvedValueOnce({ imageId: 'uploaded-b' });
     onSave.mockRejectedValueOnce(new Error('暂时保存失败'));
-    await user.upload(screen.getByLabelText('从相册选择图片'), [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
-    await user.click(screen.getByRole('button', { name: '添加颜色', exact: true }));
+    await uploadVariantPhotos(user, [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })]);
     await user.type(screen.getByRole('spinbutton', { name: '数量2' }), '5');
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('暂时保存失败');
@@ -75,7 +73,7 @@ describe('variant photo and quantity editor', () => {
   });
   it('removes a pending-photo association while retaining the entered quantity', async () => {
     const { user, api, onSave } = setup({ item: { ...base, imagePath: '', imagePaths: [], variants: [row({ quantity: 3 })] } });
-    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['a'], 'a.png', { type: 'image/png' }));
+    await uploadVariantPhotos(user, new File(['a'], 'a.png', { type: 'image/png' }));
     await user.click(screen.getByRole('button', { name: '移除图片 1', exact: true }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
@@ -93,7 +91,7 @@ describe('variant photo and quantity editor', () => {
   });
   it('rejects a zero quantity before uploading pending photos', async () => {
     const { user, api, onSave } = setup();
-    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['picture'], 'new.png', { type: 'image/png' }));
+    await uploadVariantPhotos(user, new File(['picture'], 'new.png', { type: 'image/png' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: '数量1' }), { target: { value: '0' } });
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(onSave).not.toHaveBeenCalled(); expect(api.uploadImage).not.toHaveBeenCalled();
@@ -108,7 +106,7 @@ describe('photo-specific card details', () => {
     expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('白色·S | 红色·M');
     expect(container.querySelector('.item-gallery-card__meta-row')).toHaveTextContent(/^印花$/);
     await act(async () => fireEvent.keyDown(button, { key: 'ArrowRight' }));
-    expect(screen.getByLabelText('当前规格数量1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('当前规格数量1')).not.toBeInTheDocument();
     expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('白色·S | 红色·M');
     expect(screen.queryByLabelText('当前规格数量3')).not.toBeInTheDocument();
   });

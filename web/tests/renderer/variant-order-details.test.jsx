@@ -1,3 +1,4 @@
+import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,7 @@ describe('size groups and specification ordering',()=>{
     expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('红·M | 白·L');
     expect(screen.getByLabelText('当前规格数量3')).toBeInTheDocument();
     await act(async()=>fireEvent.keyDown(screen.getByRole('button',{name:'T恤',exact:true}),{key:'ArrowRight'}));
-    expect(screen.getByLabelText('当前规格数量1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('当前规格数量1')).not.toBeInTheDocument();
     expect(container.querySelector('.item-gallery-card__variant-row')).toHaveTextContent('红·M | 白·L');
   });
   it('moves a specification with the keyboard and makes its associated image the cover on Save',async()=>{
@@ -55,11 +56,10 @@ describe('size groups and specification ordering',()=>{
   });
   it('previews a pending photo as cover after its specification moves first and saves the real uploaded ID',async()=>{
     const{user,onSave,container}=setup();
-    await user.upload(screen.getByLabelText('从相册选择图片'),new File(['new'],'new.png',{type:'image/png'}));
-    await user.click(screen.getByRole('button',{name:'添加颜色',exact:true}));
+    await uploadVariantPhotos(user, new File(['new'],'new.png',{type:'image/png'}));
     screen.getByRole('button',{name:'拖动规格3',exact:true}).focus();
     await user.keyboard('{ArrowUp}{ArrowUp}');
-    expect(container.querySelector('.web-item-image-strip').firstElementChild.querySelector('img')).toHaveAttribute('alt','待上传图片1：new.png');
+    expect(screen.getByRole('group',{name:'规格1',exact:true}).querySelector('img')).toHaveAttribute('alt','待上传图片1：new.png');
     await user.click(screen.getByRole('button',{name:'保存',exact:true}));
     await waitFor(()=>expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0]).toMatchObject({imagePath:'pending-new',imagePaths:['pending-new','a','b'],variants:[{imageId:'pending-new',quantity:1},{imageId:'a',quantity:3},{imageId:'b',quantity:1}]});

@@ -1,3 +1,4 @@
+import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { useState } from 'react';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -130,7 +131,7 @@ describe('copy a saved item into a new draft', () => {
     const { user, onCreateItem } = setup();
     await openCopy(user);
     const file = new File(['new-photo'], 'new.png', { type: 'image/png' });
-    await user.upload(screen.getByLabelText('从相册选择图片'), file);
+    await uploadVariantPhotos(user, file);
     expect(access.current.upload).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(onCreateItem).toHaveBeenCalledTimes(1));
@@ -157,7 +158,7 @@ describe('copy a saved item into a new draft', () => {
     access.current.copy.mockImplementation(async id => ({ imageId: `copy-${id}` }));
     access.current.upload.mockRejectedValueOnce(new Error('上传失败')).mockResolvedValueOnce({ imageId: 'uploaded-id' });
     await openCopy(user);
-    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['photo'], 'new.png', { type: 'image/png' }));
+    await uploadVariantPhotos(user, new File(['photo'], 'new.png', { type: 'image/png' }));
     await user.click(screen.getByRole('button', { name: '保存', exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('上传失败');
     expect(onCreateItem).not.toHaveBeenCalled();
