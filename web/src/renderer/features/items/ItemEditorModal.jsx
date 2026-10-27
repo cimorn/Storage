@@ -486,7 +486,7 @@ export default function ItemEditorModal({
           <div className="item-editor-modal__title">
             <h2 id="item-editor-title">{mode === 'copy' ? '复制新增' : mode === 'create' ? '新增物品' : draft.name || '未命名物品'}</h2>
           </div>
-          <dl className="item-editor-summary" aria-label="物品分类和位置">
+          <dl className="item-editor-summary" aria-label="物品分类和位置" tabIndex={0}>
             <div><dt>分类</dt><dd>{categoryPath || '未选'}</dd></div>
             <div><dt>位置</dt><dd>{locationPaths.join('；') || '未选'}</dd></div>
           </dl>

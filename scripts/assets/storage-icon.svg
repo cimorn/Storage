@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Storage</title>
+  <rect width="512" height="512" fill="#fff"/>
+  <path d="M114 174 150 110h212l36 64" fill="#dcefe9" stroke="#12685e" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="114" y="174" width="284" height="228" rx="22" fill="#f1f8f5" stroke="#12685e" stroke-width="20"/>
+  <path d="M114 174h284" stroke="#12685e" stroke-width="20" stroke-linecap="round"/>
+  <rect x="192" y="230" width="128" height="82" rx="14" fill="#12685e"/>
+  <path d="M231 269h50" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+</svg>
