@@ -1,0 +1,20 @@
+@media (prefers-reduced-motion: no-preference) {
+  .item-gallery-card.scroll-reveal-enter {
+    animation: storage-card-reveal 360ms cubic-bezier(0.2, 0.65, 0.3, 1);
+  }
+
+  @keyframes storage-card-reveal {
+    from { opacity: 0.35; translate: 0 var(--reveal-distance, 20px); }
+    to { opacity: 1; translate: 0 0; }
+  }
+}
+
+@media (max-width: 1024px), (pointer: coarse) {
+  .item-gallery-card { --reveal-distance: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-gallery-card.scroll-reveal-enter { animation: none; }
+}
+
+.item-gallery-card.scroll-reveal-enter:focus-visible { animation: none; }
