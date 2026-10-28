@@ -1,6 +1,6 @@
 {
   "name": "@itemmanager/web",
-  "version": "26.7.0",
+  "version": "26.7.1",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",

@@ -129,19 +129,19 @@ describe('password gated browser inventory', () => {
     render(<WebApp fetchImpl={fetchImpl} />);
     await screen.findByRole('button', { name: '普通物品', exact: true });
     await user.click(screen.getByRole('button', { name: '分类', exact: true }));
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('1 个物品');
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^1$/);
     await submitLogoPassword(user);
     await screen.findByRole('button', { name: '秘密条目', exact: true });
     await user.click(screen.getByRole('button', { name: '分类', exact: true }));
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('2 个物品');
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^2$/);
     await user.click(screen.getByRole('button', { name: '物品管理', exact: true }));
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
-    expect(document.body).not.toHaveTextContent('2 个物品');
+    expect(screen.queryByLabelText('当前分类物品数量')).not.toBeInTheDocument();
     await act(async () => finishClose());
     await user.click(within(screen.getByRole('dialog', { name: '输入密码' })).getByRole('button', { name: '取消', exact: true }));
     await screen.findByRole('button', { name: '普通物品', exact: true });
     await user.click(screen.getByRole('button', { name: '分类', exact: true }));
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('1 个物品');
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^1$/);
     expect(document.body).not.toHaveTextContent('秘密条目');
   });
 

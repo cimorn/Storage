@@ -119,7 +119,7 @@ export default function NodeEditorPane({
           <h3>{isCreate ? title || '新增节点' : node.name || '未命名节点'}</h3>
         </div>
         <div className="catalog-node-stats">
-          {!isCreate ? <span className="catalog-item-count" aria-label={`当前${mode === 'category' ? '分类' : '位置'}物品数量`} title="包含下级，按物品卡片统计">{itemCount} 个物品</span> : null}
+          {!isCreate ? <span className="catalog-item-count" aria-label={`当前${mode === 'category' ? '分类' : '位置'}物品数量`}>{itemCount}</span> : null}
           <span className="level-pill">{label}</span>
         </div>
       </div>
