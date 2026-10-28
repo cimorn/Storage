@@ -2,6 +2,7 @@ import CatalogWorkspace from '../catalog/CatalogWorkspace';
 import ItemsGalleryPage from '../items/ItemsGalleryPage';
 import TagManager from '../tags/TagManager';
 import Toolbar from './Toolbar';
+import PageBackground from './PageBackground';
 
 const CATALOG_CONTEXT_TITLES = {
   category: '分类管理',
@@ -55,6 +56,7 @@ export default function AppShell({
 
   return (
     <div className="app-shell" inert={interactionDisabled}>
+      <PageBackground />
       <Toolbar
         selectedSection={visibleSection}
         selectedCatalogMode={selectedCatalogMode}

@@ -1,0 +1,25 @@
+.page-background {
+  position: fixed;
+  z-index: -1;
+  inset: -64px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 8% 18%, rgb(15 118 110 / 11%), transparent 52%),
+    radial-gradient(ellipse at 88% 62%, rgb(47 111 159 / 10%), transparent 54%),
+    radial-gradient(ellipse at 42% 100%, rgb(217 119 6 / 4%), transparent 42%);
+  transform: translate3d(0, var(--page-parallax-y, 0px), 0);
+  will-change: transform;
+}
+
+@media (max-width: 1024px), (pointer: coarse) {
+  .page-background {
+    transform: translate3d(0, calc(var(--page-parallax-y, 0px) * 0.45), 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-background {
+    transform: none;
+    will-change: auto;
+  }
+}
