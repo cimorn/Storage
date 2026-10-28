@@ -110,6 +110,7 @@ export default function AppShell({
                   canManagePrivacy={canManagePrivacy}
                   mode={selectedCatalogMode}
                   entries={selectedModeEntries}
+                  items={project.items}
                   selectedId={selectedCatalogNodeId}
                   onSelect={onSelectCatalogNode}
                   onAddRoot={onAddCatalogRoot}

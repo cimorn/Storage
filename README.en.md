@@ -27,7 +27,7 @@ For phone access, set `STORAGE_BIND_ADDRESS=0.0.0.0` and `STORAGE_PUBLIC_ORIGIN`
 
 ## Usage
 
-Enter the access password to manage items and photos. Combine category, location, tag, and packaging filters. Drag categories and locations to reorder them.
+Enter the access password to manage items and photos. Combine category, location, tag, and packaging filters. Drag categories and locations to reorder them. Each catalog node and its details show item-card counts including descendants. Shared location ancestors count each card once, and locked views count only ordinary items.
 
 Add color, size, quantity, and packaging rows to each item. A blank quantity means 1; the item total sums all row quantities. Use the + control on a specification row to upload its photo directly; choosing again replaces that photo. Each photo belongs to only one specification. Leave color or size blank when it does not apply. Edit rows or view their photos and quantities in the Information tab. The card shows a packaging icon if any row is packaged. Bulk packaging changes apply to all rows of the selected items.
 

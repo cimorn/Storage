@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { canAddChild, getChildEntries } from '../../lib/project-data';
+import { buildCatalogItemCounts } from './catalog-item-counts';
 import NodeEditorPane from './NodeEditorPane';
 import TreePanel from './TreePanel';
 
@@ -22,6 +23,7 @@ const CREATE_TITLES = {
 export default function CatalogWorkspace({
   mode,
   entries,
+  items = [],
   selectedId,
   onSelect,
   onAddRoot,
@@ -40,6 +42,7 @@ export default function CatalogWorkspace({
   const [sorting, setSorting] = useState(false);
   const effectiveSelectedId = selectedId ?? internalSelectedId;
   const treeTitle = mode === 'category' ? '分类目录' : '位置目录';
+  const itemCounts = useMemo(() => buildCatalogItemCounts(entries, items, mode), [entries, items, mode]);
   const selectedNode = useMemo(
     () => entries.find((entry) => entry.id === effectiveSelectedId) || null,
     [effectiveSelectedId, entries]
@@ -169,13 +172,14 @@ export default function CatalogWorkspace({
               {onSaveOrder ? <button className="primary-button" type="button" onClick={onSaveOrder}>保存排序</button> : null}
             </div>
           </div> : null}
-          <TreePanel key={mode} entries={entries} selectedId={effectiveSelectedId} onSelect={handleSelect} sorting={sorting} onReorder={handleReorder} />
+          <TreePanel key={mode} entries={entries} itemCounts={itemCounts} selectedId={effectiveSelectedId} onSelect={handleSelect} sorting={sorting} onReorder={handleReorder} />
         </aside>
         <NodeEditorPane
           canManagePrivacy={canManagePrivacy}
           mode={mode}
           entries={entries}
           node={editorNode}
+          itemCount={itemCounts.get(effectiveSelectedId) || 0}
           onUpdate={onUpdate}
           onRequireEdit={onRequireEdit}
           saveOnConfirm={saveOnConfirm}
