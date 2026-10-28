@@ -27,7 +27,7 @@ const props = (mode = 'category', currentItems = items, selectedId = 'clothes') 
   visibleItems: [], search: '不匹配的搜索',
   onDeleteCatalogNode: vi.fn()
 });
-const count = (name, value) => expect(within(screen.getByRole('treeitem', { name, exact: true })).getByText(`${value} 个物品`)).toBeInTheDocument();
+const count = (name, value) => expect(within(screen.getByRole('treeitem', { name, exact: true })).getByText(String(value), { exact: true })).toBeInTheDocument();
 afterEach(cleanup);
 
 describe('catalog item totals', () => {
@@ -35,15 +35,16 @@ describe('catalog item totals', () => {
     const user = userEvent.setup();
     render(<AppShell {...props()} />);
     count('服装', 3); count('空分类', 0);
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('3 个物品');
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^3$/);
     await user.click(screen.getByRole('treeitem', { name: '服装', exact: true }));
     count('上衣', 1); count('鞋子', 1);
-    expect(screen.getByText('2 个下级')).toBeInTheDocument();
+    expect(screen.queryByText(/个下级/)).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('个物品');
   });
   it('shows three-level location counts while deduplicating the shared ancestors of multiple locations', () => {
     render(<AppShell {...props('location', items, 'top')} />);
     count('家', 3); count('衣柜', 3); count('上层', 2); count('下层', 1); count('办公室', 1);
-    expect(screen.getByLabelText('当前位置物品数量')).toHaveTextContent('2 个物品');
+    expect(screen.getByLabelText('当前位置物品数量')).toHaveTextContent(/^2$/);
   });
   it('refreshes totals when cards are added, removed or moved and hides totals for an unsaved node', async () => {
     const user = userEvent.setup();
@@ -51,7 +52,7 @@ describe('catalog item totals', () => {
     const changed = [{ ...items[0], categoryId: 'empty' }, items[2], { id: 'new', name: '新增', categoryId: 'empty' }];
     view.rerender(<AppShell {...props('category', changed)} />);
     count('服装', 1); count('空分类', 2);
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('1 个物品');
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^1$/);
     await user.click(screen.getByRole('button', { name: '新增顶级', exact: true }));
     expect(screen.queryByLabelText('当前分类物品数量')).not.toBeInTheDocument();
   });

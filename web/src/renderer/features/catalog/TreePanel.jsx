@@ -3,10 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { buildTree } from '../../lib/project-data';
 import useCatalogDrag from './useCatalogDrag';
 
-function countDescendants(node) {
-  return node.children.reduce((count, child) => count + 1 + countDescendants(child), 0);
-}
-
 function getAncestorIds(entries, nodeId) {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const ancestorIds = [];
@@ -25,7 +21,6 @@ function TreeNode({ node, itemCounts, selectedId, expandedIds, onSelect, onToggl
   const nodeLabel = node.name || '未命名节点';
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
-  const childCount = countDescendants(node);
 
   function handleSelect() {
     onSelect(node.id);
@@ -66,10 +61,7 @@ function TreeNode({ node, itemCounts, selectedId, expandedIds, onSelect, onToggl
           onClick={handleSelect}
         >
           <span className="tree-item__title">{nodeLabel}</span>
-          <span className="tree-item__counts">
-            <span className="catalog-item-count" title="包含下级，按物品卡片统计">{itemCounts?.get(node.id) || 0} 个物品</span>
-            {hasChildren ? <span className="tree-item__meta">{childCount} 个下级</span> : null}
-          </span>
+          <span className="catalog-item-count" aria-label={`${nodeLabel}物品数量`}>{itemCounts?.get(node.id) || 0}</span>
         </button>
       </div>
       {hasChildren && isExpanded ? (
