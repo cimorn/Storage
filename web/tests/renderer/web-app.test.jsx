@@ -115,6 +115,36 @@ describe('password gated browser inventory', () => {
     await checkCatalog(false);
   });
 
+  it('counts only the current privacy projection and immediately removes full counts when relocking', async () => {
+    const ordinaryFetch = server({ authenticated: true });
+    let finishClose;
+    const fetchImpl = vi.fn((url, init = {}) => {
+      if (url === '/api/privacy/close') return new Promise(resolve => { finishClose = () => resolve(response({ ok: true })); });
+      if (url === '/api/project' && init.method !== 'PUT' && init.headers?.['X-Storage-Privacy']) return Promise.resolve(response({
+        ...ordinary, scope: 'all', items: [...ordinary.items, { id: 'secret', name: '秘密条目', categoryId: 'office', locationId: 'home', isPrivate: true }]
+      }));
+      return ordinaryFetch(url, init);
+    });
+    const user = userEvent.setup();
+    render(<WebApp fetchImpl={fetchImpl} />);
+    await screen.findByRole('button', { name: '普通物品', exact: true });
+    await user.click(screen.getByRole('button', { name: '分类', exact: true }));
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('1 个物品');
+    await submitLogoPassword(user);
+    await screen.findByRole('button', { name: '秘密条目', exact: true });
+    await user.click(screen.getByRole('button', { name: '分类', exact: true }));
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('2 个物品');
+    await user.click(screen.getByRole('button', { name: '物品管理', exact: true }));
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('2 个物品');
+    await act(async () => finishClose());
+    await user.click(within(screen.getByRole('dialog', { name: '输入密码' })).getByRole('button', { name: '取消', exact: true }));
+    await screen.findByRole('button', { name: '普通物品', exact: true });
+    await user.click(screen.getByRole('button', { name: '分类', exact: true }));
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent('1 个物品');
+    expect(document.body).not.toHaveTextContent('秘密条目');
+  });
+
   it('uses the entry bootstrap without another session/project request and retains expiry handling', async () => {
     const fetchImpl = server({ authenticated: true, saveStatus: 401 });
     const api = createWebApi({ fetchImpl });

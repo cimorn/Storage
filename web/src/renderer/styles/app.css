@@ -1510,6 +1510,11 @@ button:not(:disabled):hover {
   white-space: nowrap;
 }
 
+.tree-item__counts { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 3px; }
+.catalog-item-count { display: inline-block; padding: 4px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 0.7rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tree-item__counts .catalog-item-count { font-size: 0.66rem; }
+.catalog-node-stats { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+
 .tree-node--level-2 .tree-item,
 .tree-node--level-3 .tree-item {
   min-height: 38px;

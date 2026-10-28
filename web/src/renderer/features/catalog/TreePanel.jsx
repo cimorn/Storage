@@ -20,7 +20,7 @@ function getAncestorIds(entries, nodeId) {
   return ancestorIds;
 }
 
-function TreeNode({ node, selectedId, expandedIds, onSelect, onToggle, sorting, drag, handleProps }) {
+function TreeNode({ node, itemCounts, selectedId, expandedIds, onSelect, onToggle, sorting, drag, handleProps }) {
   const isSelected = node.id === selectedId;
   const nodeLabel = node.name || '未命名节点';
   const hasChildren = node.children.length > 0;
@@ -66,7 +66,10 @@ function TreeNode({ node, selectedId, expandedIds, onSelect, onToggle, sorting, 
           onClick={handleSelect}
         >
           <span className="tree-item__title">{nodeLabel}</span>
-          {hasChildren ? <span className="tree-item__meta">{childCount} 个下级</span> : null}
+          <span className="tree-item__counts">
+            <span className="catalog-item-count" title="包含下级，按物品卡片统计">{itemCounts?.get(node.id) || 0} 个物品</span>
+            {hasChildren ? <span className="tree-item__meta">{childCount} 个下级</span> : null}
+          </span>
         </button>
       </div>
       {hasChildren && isExpanded ? (
@@ -75,6 +78,7 @@ function TreeNode({ node, selectedId, expandedIds, onSelect, onToggle, sorting, 
             <TreeNode
               key={child.id}
               node={child}
+              itemCounts={itemCounts}
               selectedId={selectedId}
               expandedIds={expandedIds}
               onSelect={onSelect}
@@ -90,7 +94,7 @@ function TreeNode({ node, selectedId, expandedIds, onSelect, onToggle, sorting, 
   );
 }
 
-export default function TreePanel({ entries, selectedId, onSelect, sorting = false, onReorder }) {
+export default function TreePanel({ entries, itemCounts, selectedId, onSelect, sorting = false, onReorder }) {
   const tree = useMemo(() => buildTree(entries), [entries]);
   const [expandedIds, setExpandedIds] = useState(() => new Set(getAncestorIds(entries, selectedId)));
   const { rootRef, drag, handleProps } = useCatalogDrag({ entries, enabled: sorting, onReorder });
@@ -146,6 +150,7 @@ export default function TreePanel({ entries, selectedId, onSelect, sorting = fal
         <TreeNode
           key={node.id}
           node={node}
+          itemCounts={itemCounts}
           selectedId={selectedId}
           expandedIds={expandedIds}
           onSelect={onSelect}
