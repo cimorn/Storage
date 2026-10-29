@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from '../layout/AppShell';
 import { applyItemGalleryFilters } from '../items/item-gallery-selectors';
 import { createProjectStore, useProjectStore } from '../../store/project-store';
-import { sanitizeProject, syncProjectItems } from '../../lib/project-data';
+import { isItemPrivate, sanitizeProject, syncProjectItems } from '../../lib/project-data';
 import { createWebApi } from './api';
 import { ImageAccessProvider } from './ImageAccessContext';
 import './web.css';
@@ -226,7 +226,13 @@ export default function WebApp({ fetchImpl, bootstrap }) {
   }
 
   const project = state.currentProject;
-  const visibleItems = useMemo(() => project ? applyItemGalleryFilters(project.items, project.categories, project.locations, state.itemFilters, state.search) : [], [project, state.itemFilters, state.search]);
+  // Keep the complete authorized project in the store for every save. The
+  // unlocked view displays only its private items, including inherited privacy.
+  const viewProject = useMemo(() => !project || !privacyOpen ? project : {
+    ...project,
+    items: project.items.filter(item => isItemPrivate(item, project))
+  }, [project, privacyOpen]);
+  const visibleItems = useMemo(() => viewProject ? applyItemGalleryFilters(viewProject.items, viewProject.categories, viewProject.locations, state.itemFilters, state.search) : [], [viewProject, state.itemFilters, state.search]);
 
   if (!authenticated) return <main className="web-login-page">
     <form className="dialog-card web-login-card" onSubmit={login}>
@@ -257,7 +263,7 @@ export default function WebApp({ fetchImpl, bootstrap }) {
     </div> : null}
     {project ? <ImageAccessProvider api={api} key={privacyEpoch}>
       <AppShell
-        project={project} canManagePrivacy={privacyOpen} interactionDisabled={busy} catalogSaveOnConfirm
+        project={viewProject} canManagePrivacy={privacyOpen} interactionDisabled={busy} catalogSaveOnConfirm
         selectedSection={state.selectedSection} selectedCatalogMode={state.selectedCatalogMode}
         selectedCatalogNodeId={state.selectedCatalogNodeIds[state.selectedCatalogMode]} selectedItemId={state.selectedItemId}
         visibleItems={visibleItems} search={state.search} filters={state.itemFilters}

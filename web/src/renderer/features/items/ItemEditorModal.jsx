@@ -30,7 +30,7 @@ function createVariantRow(row = { color: '', size: '', isPackaged: false }) {
   return { ...row, rowKey: ++variantRowSequence };
 }
 
-function normalizeItem(item, categories, locations, mode = 'edit') {
+function normalizeItem(item, categories, locations, mode = 'edit', defaultsFromItem = null) {
   if (item) {
     return {
       ...(mode === 'copy' ? {} : { id: item.id }),
@@ -53,8 +53,9 @@ function normalizeItem(item, categories, locations, mode = 'edit') {
     };
   }
 
-  const empty = createEmptyItemDraft(categories, locations);
-  return { ...empty, imagePaths: [], imagePath: '', variants: getItemVariants(empty).map(createVariantRow), locationIds: [empty.locationId || ''], isPrivate: false };
+  const empty = createEmptyItemDraft(categories, locations, mode === 'create' ? defaultsFromItem : null);
+  const locationIds = getItemLocationIds(empty);
+  return { ...empty, imagePaths: [], imagePath: '', variants: getItemVariants(empty).map(createVariantRow), locationIds: locationIds.length ? locationIds : [''], isPrivate: false };
 }
 
 function buildCategorySelection(categories, categoryId) {
@@ -80,6 +81,7 @@ export default function ItemEditorModal({
   open,
   mode = 'edit',
   item = null,
+  defaultsFromItem = null,
   categories = [],
   locations = [],
   availableTags = [],
@@ -90,7 +92,7 @@ export default function ItemEditorModal({
   onDelete,
   onCopy
 }) {
-  const [draft, setDraft] = useState(() => normalizeItem(item, categories, locations, mode));
+  const [draft, setDraft] = useState(() => normalizeItem(item, categories, locations, mode, defaultsFromItem));
   const [dirtyDraft, setDirtyDraft] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [imageFeedback, setImageFeedback] = useState({ type: '', message: '' });
@@ -144,7 +146,7 @@ export default function ItemEditorModal({
     } else {
       browserEditorSessionRef.current = null;
     }
-    setDraft(normalizeItem(item, categories, locations, mode));
+    setDraft(normalizeItem(item, categories, locations, mode, defaultsFromItem));
     setDirtyDraft(false);
     setActiveTab('edit');
     setTagInput('');
@@ -153,7 +155,7 @@ export default function ItemEditorModal({
     replacePendingImages([]);
     stagedBrowserUploadRef.current.clear();
     stagedImageCopyRef.current.clear();
-  }, [open, item, categories, locations, mode, imageAccess]);
+  }, [open, item, categories, locations, mode, imageAccess, defaultsFromItem]);
 
   const categorySelection = useMemo(
     () => buildCategorySelection(categories, draft.categoryId),
