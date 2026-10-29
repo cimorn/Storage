@@ -1,4 +1,3 @@
-import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
 import { StrictMode } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -66,11 +65,14 @@ describe('password gated browser inventory', () => {
     const view = render(<WebApp fetchImpl={fetchImpl} />);
     await screen.findByRole('button', { name: '普通物品' });
     async function checkEditors(unlocked) {
-      for (const name of ['新增物品', '普通物品']) {
+      for (const name of ['新增物品', unlocked ? '隐藏物品' : '普通物品']) {
         await user.click(screen.getByRole('button', { name, exact: true }));
         const dialog = screen.getByRole('dialog');
-        if (unlocked) expect(within(dialog).getByRole('checkbox', { name: '隐私区' })).toBeEnabled();
-        else expect(dialog).not.toHaveTextContent('隐私');
+        if (unlocked) {
+          const privacyChoice = within(dialog).getByRole('checkbox', { name: '隐私区' });
+          expect(privacyChoice).toBeInTheDocument();
+          if (name === '隐藏物品') expect(privacyChoice).toBeChecked();
+        } else expect(dialog).not.toHaveTextContent('隐私');
         expect(within(dialog).getByRole('checkbox', { name: '包装1' })).toBeEnabled();
         await user.click(screen.getByRole('button', { name: '关闭物品弹窗' }));
       }
@@ -115,7 +117,7 @@ describe('password gated browser inventory', () => {
     await checkCatalog(false);
   });
 
-  it('counts only the current privacy projection and immediately removes full counts when relocking', async () => {
+  it('counts only the current privacy view and immediately removes private counts when relocking', async () => {
     const ordinaryFetch = server({ authenticated: true });
     let finishClose;
     const fetchImpl = vi.fn((url, init = {}) => {
@@ -133,7 +135,7 @@ describe('password gated browser inventory', () => {
     await submitLogoPassword(user);
     await screen.findByRole('button', { name: '秘密条目', exact: true });
     await user.click(screen.getByRole('button', { name: '分类', exact: true }));
-    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^2$/);
+    expect(screen.getByLabelText('当前分类物品数量')).toHaveTextContent(/^1$/);
     await user.click(screen.getByRole('button', { name: '物品管理', exact: true }));
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('当前分类物品数量')).not.toBeInTheDocument();
@@ -199,7 +201,7 @@ describe('password gated browser inventory', () => {
     expect(document.body).not.toHaveTextContent('隐藏物品');
   });
 
-  it('keeps the toolbar quiet and opens all records only after the independent password', async () => {
+  it('keeps the toolbar quiet and shows only private records after the independent password', async () => {
     const fetchImpl = server({ authenticated: true });
     const user = userEvent.setup();
     render(<WebApp fetchImpl={fetchImpl} />);
@@ -209,10 +211,51 @@ describe('password gated browser inventory', () => {
     expect(document.body).not.toHaveTextContent(/隐私|重新读取|完整备份|导入 JSON|退出登录/);
     await submitLogoPassword(user);
     expect(await screen.findByRole('button', { name: '隐藏物品' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '普通物品', exact: true })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('访问密码')).not.toBeInTheDocument();
     expect(fetchImpl).toHaveBeenCalledWith('/api/privacy/open', expect.objectContaining({ body: JSON.stringify({ password: 'separate-password' }), headers: expect.objectContaining({ 'X-CSRF-Token': 'csrf' }) }));
     expect(fetchImpl).toHaveBeenCalledWith('/api/project', expect.objectContaining({ headers: expect.objectContaining({ 'X-Storage-Privacy': 'tab-private' }) }));
     expect(document.body).not.toHaveTextContent(/隐私区已打开|隐私范围|密码正确/);
+  });
+
+  it('resets ordinary filters on unlock and includes explicit, category and location inherited privacy', async () => {
+    const normalFetch = server({ authenticated: true });
+    const privateProject = {
+      ...full,
+      categories: [...full.categories, { id: 'look-child', name: '衣物', level: 2, parentId: 'look' }],
+      locations: [...full.locations,
+        { id: 'private-room', name: '私密位置', level: 1, parentId: null, isPrivate: true },
+        { id: 'private-box', name: '柜子', level: 2, parentId: 'private-room' }
+      ],
+      items: [...full.items,
+        { id: 'category-secret', name: '分类隐私物品', categoryId: 'look-child', isPrivate: false, imagePath: '', tags: [] },
+        { id: 'location-secret', name: '位置隐私物品', categoryId: 'office', locationIds: ['home', 'private-box'], isPrivate: false, imagePath: '', tags: [] },
+        { id: 'explicit-secret', name: '手动隐私物品', categoryId: 'office', isPrivate: true, imagePath: '', tags: [] }
+      ]
+    };
+    const fetchImpl = vi.fn((url, init = {}) => url === '/api/project' && init.method !== 'PUT' && init.headers?.['X-Storage-Privacy']
+      ? Promise.resolve(response(privateProject)) : normalFetch(url, init));
+    const user = userEvent.setup();
+    render(<WebApp fetchImpl={fetchImpl} />);
+    await screen.findByRole('button', { name: '普通物品', exact: true });
+    act(() => {
+      useProjectStore.getState().setSearch('普通');
+      useProjectStore.getState().setItemFilters({ mainCategoryId: 'office', locationId: 'home', tag: 'PUBLIC' });
+    });
+    await submitLogoPassword(user);
+    for (const name of ['隐藏物品', '分类隐私物品', '位置隐私物品', '手动隐私物品']) {
+      expect(await screen.findByRole('button', { name, exact: true })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: '普通物品', exact: true })).not.toBeInTheDocument();
+    expect(useProjectStore.getState().search).toBe('');
+    expect(useProjectStore.getState().itemFilters).toMatchObject({ mainCategoryId: '', locationId: '', tag: '' });
+    // Rendering the private view must not discard the ordinary records needed for saves.
+    expect(useProjectStore.getState().currentProject.items).toHaveLength(5);
+    await submitLogoPassword(user, 'wrong-password');
+    expect(await screen.findByRole('button', { name: '普通物品', exact: true })).toBeInTheDocument();
+    for (const name of ['隐藏物品', '分类隐私物品', '位置隐私物品', '手动隐私物品']) {
+      expect(screen.queryByRole('button', { name, exact: true })).not.toBeInTheDocument();
+    }
   });
 
   it.each(['wrong-password', 'correct-password', ''])('silently leaves ordinary records unchanged for an unsuccessful password attempt %j', async (password) => {
@@ -364,16 +407,22 @@ describe('password gated browser inventory', () => {
     await screen.findByRole('button', { name: '普通物品' });
     await submitLogoPassword(user);
     await screen.findByRole('button', { name: '隐藏物品' });
-    await user.click(await screen.findByRole('button', { name: '普通物品' }));
+    const ordinaryBefore = structuredClone(useProjectStore.getState().currentProject.items.find(item => item.id === 'normal'));
+    await user.click(screen.getByRole('button', { name: '隐藏物品', exact: true }));
     const dialog = screen.getByRole('dialog');
-    await uploadVariantPhotos(user, new File(['photo'], 'photo.png', { type: 'image/png' }));
+    await user.click(within(dialog).getByRole('button', { name: '上传规格1图片', exact: true }));
+    await user.upload(screen.getByLabelText('从相册选择图片'), new File(['photo'], 'photo.png', { type: 'image/png' }));
     expect(fetchImpl.mock.calls.some(([url]) => url === '/api/images')).toBe(false);
-    await user.click(within(dialog).getByLabelText('隐私区'));
+    expect(within(dialog).getByLabelText('隐私区')).toBeChecked();
     await user.click(within(dialog).getByRole('button', { name: '保存', exact: true }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(useProjectStore.getState().currentProject.items[0]).toMatchObject({ isPrivate: true, imagePath: 'uploaded-image' });
+    expect(useProjectStore.getState().currentProject.items.find(item => item.id === 'hidden')).toMatchObject({ isPrivate: true, imagePath: 'uploaded-image' });
+    expect(useProjectStore.getState().currentProject.items.find(item => item.id === 'normal')).toEqual(ordinaryBefore);
+    expect(screen.queryByRole('button', { name: '普通物品', exact: true })).not.toBeInTheDocument();
     const saved = fetchImpl.mock.calls.find(([url, init]) => url === '/api/project' && init.method === 'PUT');
     expect(JSON.parse(saved[1].body)).toMatchObject({ revision: 3, scope: 'all', items: expect.arrayContaining([expect.objectContaining({ isPrivate: true, imagePath: 'uploaded-image' })]) });
+    expect(JSON.parse(saved[1].body).items).toHaveLength(2);
+    expect(JSON.parse(saved[1].body).items.find(item => item.id === 'normal')).toMatchObject({ id: 'normal', name: '普通物品', isPrivate: false, imagePath: '' });
     expect(saved[1].headers['X-Storage-Privacy']).toBe('tab-private');
     expect(saved[1].headers['X-CSRF-Token']).toBe('csrf');
     expect(fetchImpl.mock.calls.find(([url]) => url === '/api/images')[1].body).toContain('data:image/png;base64,');

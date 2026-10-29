@@ -1,5 +1,5 @@
 import { normalizeItemDetail } from './item-detail-text';
-import { formatItemVariants, getItemQuantity, getItemVariants, hasItemPackaging } from '../../../../shared/item-variants.mjs';
+import { formatItemVariants, getItemQuantity, getItemVariants, getVariantQuantity, hasItemPackaging } from '../../../../shared/item-variants.mjs';
 import { collectDescendantIds, getChildEntries, getItemLocationIds, getNodeLineage, normalizeTagCodes, toText } from '../../lib/project-data';
 
 export function formatCompactPath(path) {
@@ -45,14 +45,14 @@ export function sortItemGalleryItems(items = [], sort = 'updated-desc') {
     .map(({ item }) => item);
 }
 
-export function createEmptyItemDraft(categories = [], locations = []) {
+export function createEmptyItemDraft(categories = [], locations = [], previousItem = null) {
   const firstMainCategory = getChildEntries(categories, null)[0] || null;
   const firstSubCategory = firstMainCategory ? getChildEntries(categories, firstMainCategory.id)[0] || null : null;
   const level1Location = getChildEntries(locations, null)[0] || null;
   const level2Location = level1Location ? getChildEntries(locations, level1Location.id)[0] || null : null;
   const level3Location = level2Location ? getChildEntries(locations, level2Location.id)[0] || null : null;
 
-  return {
+  const empty = {
     barcode: '',
     code: '',
     name: '',
@@ -64,6 +64,25 @@ export function createEmptyItemDraft(categories = [], locations = []) {
     locationId: level3Location?.id || level2Location?.id || level1Location?.id || null,
     imagePath: '',
     tags: []
+  };
+  if (!previousItem) return empty;
+
+  const locationIds = getItemLocationIds(previousItem).filter(id => locations.some(location => location.id === id));
+  const rows = getItemVariants(previousItem);
+  const variants = (rows.length ? rows : getItemVariants(empty)).map(row => ({
+    color: row.color, size: row.size, quantity: getVariantQuantity(row), isPackaged: row.isPackaged, imageId: ''
+  }));
+  return {
+    ...empty,
+    brand: toText(previousItem.brand),
+    specification: toText(previousItem.specification),
+    categoryId: categories.some(category => category.id === previousItem.categoryId) ? previousItem.categoryId : null,
+    locationId: locationIds[0] || null,
+    locationIds,
+    variants,
+    quantity: getItemQuantity({ variants }),
+    isPackaged: variants.some(row => row.isPackaged),
+    isPrivate: false
   };
 }
 

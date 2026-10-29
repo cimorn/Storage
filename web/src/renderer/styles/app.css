@@ -1087,6 +1087,7 @@ button:not(:disabled):hover {
 
 .item-gallery-card__content {
   display: grid;
+  grid-template-rows: auto 0.864rem 14px;
   min-width: 0;
   gap: 2px;
   padding: 0 1px;

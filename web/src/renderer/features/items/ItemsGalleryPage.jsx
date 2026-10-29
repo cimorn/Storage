@@ -62,7 +62,9 @@ export default function ItemsGalleryPage({
     setModalState({
       open: true,
       mode: 'create',
-      itemId: null
+      itemId: null,
+      // Reverse the stable tie order for older records without creation dates.
+      defaultsFromItem: sortItemGalleryItems([...allItems].reverse(), 'created-desc')[0] || null
     });
   }
 
@@ -257,6 +259,7 @@ export default function ItemsGalleryPage({
 
       <ItemEditorModal
         canManagePrivacy={canManagePrivacy}
+        defaultsFromItem={modalState.mode === 'create' ? modalState.defaultsFromItem : null}
         open={modalState.open}
         mode={modalState.mode}
         item={modalState.mode === 'copy' ? modalState.copyItem : modalState.mode === 'edit' ? editingItem : null}

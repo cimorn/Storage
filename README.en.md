@@ -37,11 +37,13 @@ Uploads become WebP images with a maximum long edge of 1920 pixels, without enla
 
 Items are sorted by latest update by default.
 
+New items reuse the most recently added item's category, locations, brand, style and variant settings in the current area. Enter a new name, barcode, tags and photos; the private checkbox is not carried over.
+
 The background moves subtly as you scroll, and item cards slide into view on their first entrance. The first screen appears immediately. Both effects respect the system's reduced-motion preference.
 
 The first visit downloads the interface. If a module fails to load after login, the page reloads once to fetch the current application; if it fails again, use Reload to try again.
 
-Click the app name at the top-left to unlock the private area. Locking or refreshing hides it again.
+Click the app name at the top-left to unlock the private area and show only private items. Click it again to return to ordinary items. Refreshing hides the private area again.
 
 ## Development
 
