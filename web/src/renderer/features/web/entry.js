@@ -35,7 +35,7 @@ export function startWebEntry({ root, fetchImpl, loadApp, timeoutMs = 15000, mod
   function bounded(promise, controller, stage) {
     const messages = {
       session: '连接网站超时，请重试',
-      login: '登录请求超时，请重试',
+      login: '登录超时，请重试',
       project: '读取物品超时，请重试',
       module: '界面文件下载超时，请重试或切换网络'
     };
@@ -78,7 +78,7 @@ export function startWebEntry({ root, fetchImpl, loadApp, timeoutMs = 15000, mod
     ready = { project, attempt };
     busy = true;
     updateButton();
-    status('正在打开物品…');
+    status('正在打开物品列表…');
     let app;
     try { app = await bounded(preload(), null, 'module'); }
     catch (error) {
@@ -123,7 +123,7 @@ export function startWebEntry({ root, fetchImpl, loadApp, timeoutMs = 15000, mod
       submittedPassword = '';
       await bounded(request, controller, 'login');
       if (stopped || attempt !== epoch) return;
-      status('密码已验证，正在读取物品…');
+      status('正在读取物品…');
       const project = await bounded(api.getProject({ signal: controller.signal }), controller, 'project');
       await open(project, attempt);
     } catch (error) { failed(error, attempt); }

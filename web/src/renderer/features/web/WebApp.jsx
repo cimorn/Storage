@@ -134,7 +134,7 @@ export default function WebApp({ fetchImpl, bootstrap }) {
   async function persistCatalog(action, mode, ...args) {
     return run(async (epoch) => {
       const original = useProjectStore.getState();
-      if (!original.currentProject) throw new Error('项目暂时无法读取，请刷新页面重试');
+      if (!original.currentProject) throw new Error('物品读取失败，请刷新后重试');
       const staged = createProjectStore();
       staged.getState().setProject(original.currentProject);
       staged.setState({ selectedCatalogNodeIds: { ...original.selectedCatalogNodeIds } });
@@ -160,7 +160,7 @@ export default function WebApp({ fetchImpl, bootstrap }) {
   async function persistItem(draft, itemId) {
     return run(async (epoch) => {
       const original = useProjectStore.getState().currentProject;
-      if (!original) throw new Error('项目暂时无法读取，请刷新页面重试');
+      if (!original) throw new Error('物品读取失败，请刷新后重试');
       // Stage edits independently so a rejected save cannot reset the editor's draft.
       const staged = createProjectStore();
       staged.getState().setProject(original);
@@ -246,8 +246,8 @@ export default function WebApp({ fetchImpl, bootstrap }) {
   return <div className="web-app" aria-busy={busy}>
     {feedback.message || project?.storageWarning?.code === 'CLEANUP_PENDING' || conflict ? <div className="web-feedback">
       {feedback.message ? <span role={feedback.error ? 'alert' : 'status'}>{feedback.message}</span> : null}
-      {project?.storageWarning?.code === 'CLEANUP_PENDING' ? <span role="status">图片清理尚未完成，将自动重试。物品数据已保存。</span> : null}
-      {conflict ? <span>修改仍保留，请核对其他设备的更新后重试。</span> : null}
+      {project?.storageWarning?.code === 'CLEANUP_PENDING' ? <span role="status">物品已保存，图片清理会自动重试</span> : null}
+      {conflict ? <span>你的修改仍在。核对其他设备的更新后再试。</span> : null}
     </div> : null}
     {passwordPromptOpen ? <div className="dialog-backdrop" role="presentation">
       <form className="dialog-card web-password-dialog" role="dialog" aria-modal="true" aria-labelledby="web-password-title" onSubmit={submitPassword} onKeyDown={(event) => {
@@ -276,6 +276,6 @@ export default function WebApp({ fetchImpl, bootstrap }) {
         onBulkUpdateItems={state.bulkUpdateItems} onSaveProject={save}
         onDeleteTag={state.deleteTag} onDeleteTags={state.deleteTags} onRenameTag={state.renameTag} onUpdateTagPrefix={state.updateTagPrefix}
       />
-    </ImageAccessProvider> : <p className="web-loading" role="status">{busy ? '正在读取物品…' : '项目暂时无法读取，请刷新页面重试。'}</p>}
+    </ImageAccessProvider> : <p className="web-loading" role="status">{busy ? '正在读取物品…' : '物品读取失败，请刷新后重试'}</p>}
   </div>;
 }

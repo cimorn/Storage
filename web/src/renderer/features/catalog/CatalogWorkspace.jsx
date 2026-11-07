@@ -165,7 +165,7 @@ export default function CatalogWorkspace({
             </button>
           </div>
           {sorting ? <div className="catalog-sort-controls" aria-label={`${treeTitle}排序`}>
-            <p>拖动手柄调整同级顺序，排好后保存。</p>
+            <p>拖动手柄调整同级顺序，完成后保存</p>
             <div className="catalog-sort-controls__actions">
               <button className="secondary-button" type="button" disabled={selectedIndex <= 0} onClick={() => moveSelected(-1)}>上移</button>
               <button className="secondary-button" type="button" disabled={selectedIndex < 0 || selectedIndex >= siblings.length - 1} onClick={() => moveSelected(1)}>下移</button>

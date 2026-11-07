@@ -251,6 +251,7 @@ export default function ItemsGalleryPage({
 
       <ItemGalleryGrid
         items={galleryItems}
+        hasItems={allItems.length > 0}
         selectedItemId={selectedItemId}
         bulkMode={bulkMode}
         bulkSelectedIds={bulkSelectedIds}

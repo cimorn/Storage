@@ -4,7 +4,7 @@ import ItemGalleryCard from './ItemGalleryCard';
 import { observeScrollReveal } from './scroll-reveal';
 import './scroll-reveal.css';
 
-export default function ItemGalleryGrid({ items, bulkMode = false, bulkSelectedIds = new Set(), onSelect }) {
+export default function ItemGalleryGrid({ items, hasItems = false, bulkMode = false, bulkSelectedIds = new Set(), onSelect }) {
   const gridRef = useRef(null);
   const seenRef = useRef(new WeakSet());
   useEffect(() => observeScrollReveal(gridRef.current, seenRef.current), [items]);
@@ -12,8 +12,8 @@ export default function ItemGalleryGrid({ items, bulkMode = false, bulkSelectedI
   if (!items.length) {
     return (
       <div className="item-gallery-empty">
-        <p>没有匹配物品</p>
-        <span>换个筛选，或者直接新增。</span>
+        <p>{hasItems ? '没有找到物品' : '还没有物品'}</p>
+        <span>{hasItems ? '试试换个关键词或筛选条件' : '点击「新增物品」开始记录'}</span>
       </div>
     );
   }

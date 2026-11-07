@@ -380,7 +380,7 @@ export default function ItemEditorModal({
 
   function requestClose() {
     if (saving) return;
-    if (dirtyDraft && !window.confirm('当前物品还有未保存修改，确定关闭吗？')) {
+    if (dirtyDraft && !window.confirm('还有修改没保存。确定关闭？')) {
       return;
     }
 
@@ -389,7 +389,7 @@ export default function ItemEditorModal({
 
   function requestCopy() {
     if (saving || !imageAccess || !onCopy) return;
-    if (dirtyDraft && !window.confirm('复制将使用已保存的物品内容，当前修改不会带入。继续复制？')) return;
+    if (dirtyDraft && !window.confirm('只复制已保存的内容。继续复制？')) return;
     onCopy();
   }
 
