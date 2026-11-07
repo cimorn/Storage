@@ -9,17 +9,18 @@
     <title>物品管理</title>
     <style>
       body:has(.entry-page) { margin: 0; }
-      .entry-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; color: #172026; background: #eef2f5; font: 400 16px/1.5 "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei UI", sans-serif; }
+      .entry-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; color: #172026; background: #f5f6f6; font: 400 16px/1.5 "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei UI", sans-serif; }
       .entry-page * { box-sizing: border-box; }
-      .entry-card { display: grid; gap: 18px; width: min(100%, 400px); padding: 34px; background: rgba(255,255,255,.88); border: 1px solid rgba(33,47,57,.12); border-radius: 8px; box-shadow: 0 24px 54px rgba(23,32,38,.14); }
-      .entry-card h1 { margin: 0; font-size: 28px; }
-      .entry-field { display: grid; gap: 6px; }
-      .entry-field span { color: #64717d; font-size: .76rem; font-weight: 800; }
-      .entry-field input { width: 100%; padding: 10px 11px; color: #172026; background: #fff; border: 1px solid rgba(33,47,57,.12); border-radius: 8px; outline: none; font: inherit; }
-      .entry-field input:focus { border-color: rgba(15,118,110,.46); box-shadow: 0 0 0 4px rgba(15,118,110,.08); }
-      .entry-card button { min-height: 34px; padding: 7px 13px; color: #fff; background: #0f766e; border: 0; border-radius: 8px; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; box-shadow: 0 10px 18px rgba(15,118,110,.22); }
-      .entry-card button:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
-      .entry-card [data-entry-retry] { color: #64717d; background: transparent; box-shadow: none; }
+      .entry-card { display: grid; gap: 16px; width: min(100%, 400px); padding: 32px; background: #fff; border: 1px solid rgba(23,32,38,.11); border-radius: 12px; }
+      .entry-card h1 { margin: 0; font-size: 24px; font-weight: 600; }
+      .entry-field { display: grid; gap: 4px; }
+      .entry-field span { color: #59656b; font-size: .875rem; font-weight: 500; }
+      .entry-field input { width: 100%; min-height: 44px; padding: 8px 12px; color: #172026; background: #fff; border: 1px solid rgba(23,32,38,.22); border-radius: 8px; font: inherit; }
+      .entry-card :focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+      .entry-card button { min-height: 44px; padding: 8px 12px; color: #fff; background: #0f766e; border: 0; border-radius: 8px; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
+      .entry-card button:disabled { opacity: .52; cursor: not-allowed; }
+      .entry-card [data-entry-retry] { color: #59656b; background: transparent; }
+      .entry-card [data-entry-feedback] { margin: 0; color: #59656b; font-size: .875rem; }
       .entry-card [role=alert] { color: #b42318; }
       .entry-card [hidden] { display: none; }
     </style>

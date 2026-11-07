@@ -1,6 +1,12 @@
 .web-login-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--bg, #f4f5f2); }
-.web-login-card { display: grid; gap: 18px; width: min(100%, 400px); padding: 34px; }
-.web-login-card h1 { margin: 0; font-size: 28px; }
+.web-login-card { display: grid; gap: 16px; width: min(100%, 400px); padding: 32px; border-radius: 12px; box-shadow: none; }
+.web-login-card h1 { margin: 0; font-size: 24px; font-weight: 600; }
+.web-login-card .field { gap: 4px; }
+.web-login-card .field span { font-size: .875rem; font-weight: 500; }
+.web-login-card .field input,
+.web-login-card .primary-button { min-height: 44px; padding: 8px 12px; }
+.web-login-card .field input { border-color: var(--border-strong); font-size: 1rem; }
+.web-login-card .primary-button { font-size: .875rem; }
 .web-app { height: 100dvh; display: flex; flex-direction: column; }
 .web-app > .app-shell, .web-app > :last-child.app-shell { min-height: 0; flex: 1; height: auto; }
 .web-feedback { position: fixed; bottom: 16px; left: 50%; z-index: 20; display: flex; flex-wrap: wrap; width: max-content; max-width: calc(100vw - 32px); gap: 5px 18px; padding: 8px 12px; transform: translateX(-50%); color: var(--text-soft); background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); font-size: 12px; line-height: 1.6; }
@@ -154,7 +160,7 @@
   .web-app .item-filter-group__chips button { width: auto; flex: 0 0 auto; }
   .web-app .items-gallery-page__toolbar-side--actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
   .web-app .items-gallery-page__toolbar-side--actions > * { min-width: 0; padding-left: 7px; padding-right: 7px; }
-  .web-app .item-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .web-app .item-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .dialog-backdrop.web-item-editor-backdrop { padding: 8px; }
   .web-item-editor-backdrop .item-editor-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   .web-item-editor-backdrop .item-editor-modal__header { padding: 12px; }

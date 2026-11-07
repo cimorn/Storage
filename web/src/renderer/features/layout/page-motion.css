@@ -3,10 +3,7 @@
   z-index: -1;
   inset: -64px;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at 8% 18%, rgb(15 118 110 / 11%), transparent 52%),
-    radial-gradient(ellipse at 88% 62%, rgb(47 111 159 / 10%), transparent 54%),
-    radial-gradient(ellipse at 42% 100%, rgb(217 119 6 / 4%), transparent 42%);
+  background: linear-gradient(160deg, #ebeeed, var(--bg) 64%);
   transform: translate3d(0, var(--page-parallax-y, 0px), 0);
   will-change: transform;
 }
