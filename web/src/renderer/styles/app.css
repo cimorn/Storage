@@ -1128,7 +1128,7 @@ button:focus-visible {
 .item-gallery-card__meta-text {
   display: block;
   min-width: 0;
-  color: var(--text-soft);
+  color: var(--accent-warm);
   font-size: 0.6875rem;
   line-height: 16px;
   text-align: center;
