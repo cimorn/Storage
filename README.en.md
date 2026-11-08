@@ -47,6 +47,8 @@ Click the app name at the top-left to unlock the private area and show only priv
 
 ## Development
 
+See the [web development guide (Chinese)](docs/development.md) for the source map, local preview, checks, and PR release workflow.
+
 Requires Node.js 24+ and pnpm 11.
 
 ```text
