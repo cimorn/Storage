@@ -51,7 +51,6 @@ docker compose up -d
 
 ```text
 web/        网页前端、服务端和网页测试
-desktop/    独立 Electron 客户端、图标和打包脚本
 scripts/    Docker 运行与备份恢复检查
 ```
 
@@ -65,17 +64,15 @@ pnpm dev
 ```sh
 pnpm test
 pnpm build
-pnpm desktop:dev
-pnpm desktop:build
 ```
 
-网页构建输出到 `web/dist/renderer/`，Windows 客户端输出到 `dist/Desktop-*/`。客户端连接地址在 `desktop/src/policy.cjs` 配置，详见 [客户端开发说明](desktop/README.md)。
+网页构建输出到 `web/dist/renderer/`。
 
 ## 发布与更新
 
-网页和客户端使用统一版本号，格式为“年份后两位.大版本.小版本”，例如 `26.1.1`，表示 2026 年的第 1 个大版本、第 1 个小版本。发布前同步更新根目录、`web/`、`desktop/` 下三个 `package.json` 的 `version`，再推送到 `main`。每次发布递增版本号。
+版本号格式为“年份后两位.大版本.小版本”，例如 `26.1.1`。发布前同步更新根目录和 `web/` 下两个 `package.json` 的 `version`，再将拉取请求合并到 `main`。
 
-GitHub Actions 测试并检查 Docker 部署后，自动发布 `ghcr.io/cimorn/storage:latest` 和对应版本镜像，例如 `ghcr.io/cimorn/storage:26.1.6`。`latest` 跟随 `main` 更新。客户端有独立构建任务，EXE 可从对应任务的 Artifacts 下载，文件名包含版本号。
+GitHub Actions 测试并检查 Docker 部署后，自动发布 `ghcr.io/cimorn/storage:latest` 和对应版本镜像，例如 `ghcr.io/cimorn/storage:26.1.6`。`latest` 跟随 `main` 更新。
 
 在部署目录更新网页：
 
@@ -83,8 +80,6 @@ GitHub Actions 测试并检查 Docker 部署后，自动发布 `ghcr.io/cimorn/s
 docker compose pull storage
 docker compose up -d --no-deps storage
 ```
-
-客户端只连接网页，网页更新后重新打开即可。客户端自身代码有变化时重新构建并替换 EXE。
 
 ## 备份与恢复
 

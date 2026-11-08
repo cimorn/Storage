@@ -1,6 +1,5 @@
 packages:
   - web
-  - desktop
 supportedArchitectures:
   os:
     - current
@@ -12,6 +11,3 @@ supportedArchitectures:
   libc:
     - current
     - glibc
-allowBuilds:
-  electron: true
-  electron-winstaller: true

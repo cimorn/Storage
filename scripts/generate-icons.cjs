@@ -18,7 +18,7 @@ async function generateIcons(){
     header.writeUInt32LE(image.length,entry+8);header.writeUInt32LE(offset,entry+12);offset+=image.length;
   });
   const ico=Buffer.concat([header,...images]),png=images.at(-1);
-  for(const [file,bytes] of [['web/public/icon.png',png],['web/public/favicon.ico',ico],['desktop/assets/app-icon.png',png],['desktop/assets/app-icon.ico',ico]]){
+  for(const [file,bytes] of [['web/public/icon.png',png],['web/public/favicon.ico',ico]]){
     await fs.writeFile(path.join(root,file),bytes);
   }
   console.log('Generated Storage icons: opaque white PNG256 and ICO16/24/32/48/64/128/256.');

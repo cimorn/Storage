@@ -51,7 +51,6 @@ Requires Node.js 24+ and pnpm 11.
 
 ```text
 web/        Web frontend, server, and web tests
-desktop/    Independent Electron client, icons, and build scripts
 scripts/    Docker runtime and backup/restore checks
 ```
 
@@ -65,17 +64,15 @@ Development runs at `http://127.0.0.1:5173` with in-memory fixtures. Passwords: 
 ```sh
 pnpm test
 pnpm build
-pnpm desktop:dev
-pnpm desktop:build
 ```
 
-Web output: `web/dist/renderer/`. Windows output: `dist/Desktop-*/`. Configure the client URL in `desktop/src/policy.cjs`; see [client development](desktop/README.md).
+The web build writes to `web/dist/renderer/`.
 
 ## Publish and update
 
-The web app and desktop client share a version in the form `YY.major.minor`. For example, `26.1.1` is the first minor release of the first major series in 2026. Before publishing, update `version` in all three `package.json` files at the root, in `web/`, and in `desktop/`, then push to `main`. Increment the version for each release.
+Versions use `YY.major.minor`, such as `26.1.1`. Before publishing, update `version` in the root and `web/` package files, then merge the pull request into `main`.
 
-After tests and Docker deployment checks pass, GitHub Actions publishes `ghcr.io/cimorn/storage:latest` and the matching version tag, such as `ghcr.io/cimorn/storage:26.1.6`. The `latest` tag follows `main`. The desktop client has a separate build job; download its EXE, with the version in its filename, from that job's Artifacts.
+After tests and Docker deployment checks pass, GitHub Actions publishes `ghcr.io/cimorn/storage:latest` and the matching version tag, such as `ghcr.io/cimorn/storage:26.1.6`. The `latest` tag follows `main`.
 
 Update the web service from the deployment directory:
 
@@ -83,8 +80,6 @@ Update the web service from the deployment directory:
 docker compose pull storage
 docker compose up -d --no-deps storage
 ```
-
-Reopen the client after a web update. Rebuild and replace the EXE when the client itself changes.
 
 ## Backups and recovery
 
