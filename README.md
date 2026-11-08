@@ -47,6 +47,8 @@ docker compose up -d
 
 ## 开发
 
+完整的目录说明、修改入口和发布流程见 [网页开发文档](docs/development.md)。
+
 需要 Node.js 24+、pnpm 11。
 
 ```text

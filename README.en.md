@@ -47,6 +47,8 @@ Click the app name at the top-left to unlock the private area and show only priv
 
 ## Development
 
+See the [web development guide (Chinese)](docs/development.md) for the source map, local preview, checks, and PR release workflow.
+
 Requires Node.js 24+ and pnpm 11.
 
 ```text
@@ -59,7 +61,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Development runs at `http://127.0.0.1:5173` with in-memory fixtures. Passwords: `preview-storage` and `preview-private`.
+Development runs at `http://127.0.0.1:5173` with empty in-memory storage. Passwords: `preview-storage` and `preview-private`.
 
 ```sh
 pnpm test
