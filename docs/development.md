@@ -116,6 +116,8 @@ git push -u origin change/short-description
 
 GitHub Actions 会运行测试、网页构建、Compose 部署检查及 ARM64 运行检查。PR 通过检查后可合并，合并到 `main` 会发布 `ghcr.io/cimorn/storage:latest` 和对应版本标签。等待镜像发布任务成功后，再更新部署。
 
+当前工作流也会检查纯文档提交，并在合并后重新发布当前版本的镜像标签。
+
 ## 更新部署
 
 在现有部署目录运行以下命令。
@@ -126,7 +128,7 @@ docker compose up -d --no-deps storage
 docker compose ps
 ```
 
-使用 NAS Docker 管理界面时，打开 `storage` 项目，选择重新部署并勾选“拉取最新镜像”。更新后打开网站，检查登录、物品图片、编辑保存和隐私区。
+使用 NAS Docker 管理界面时，打开对应的 Compose 项目，选择重新部署并勾选“拉取最新镜像”。更新后打开网站，检查登录、物品图片、编辑保存和隐私区。
 
 初次部署参见 [README](../README.md)，固定镜像与回退参见 [镜像说明](docker-images.md)，数据恢复参见 [备份说明](backup.md)。
 
