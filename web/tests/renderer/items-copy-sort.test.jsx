@@ -1,5 +1,4 @@
 import { uploadVariantPhotos } from '../helpers/upload-variant-photo';
-import { useState } from 'react';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -264,27 +263,27 @@ describe('visible gallery sorting', () => {
   it('sorts recently modified items first, using creation date when the modification date is absent or invalid', () => {
     expect(sortItemGalleryItems(items, 'updated-desc').map(item => item.id)).toEqual(['old', 'new', 'same', 'legacy-a', 'legacy-b']);
   });
-  it('changes only the visible item order and reports a sort filter patch', async () => {
+  it('always shows the newest modification first without a sorting control, even with a stale creation-sort filter', () => {
     const onFilterChange = vi.fn();
     const visible = [{ ...source, id: 'first', name: '旧物品', imagePath: '', createdAt: '2025-01-01', updatedAt: '2026-04-01' },
       { ...source, id: 'second', name: '新物品', imagePath: '', createdAt: '2026-01-01', updatedAt: '2026-02-01' }];
-    function Harness() {
-      const [filters, setFilters] = useState({ mainCategoryId: 'ordinary', locationId: 'home', sort: '' });
-      return <ItemsGalleryPage allItems={[...visible, { ...source, id: 'hidden', name: '隐藏物品', createdAt: '2027-01-01' }]} items={visible}
-        categories={categories} locations={locations} filters={filters} onFilterChange={patch => { onFilterChange(patch); setFilters(current => ({ ...current, ...patch })); }} />;
-    }
-    const view = render(<Harness />);
+    const props = {
+      allItems: [...visible, { ...source, id: 'hidden', name: '隐藏物品', createdAt: '2027-01-01' }],
+      items: visible, categories, locations, onFilterChange,
+      filters: { mainCategoryId: 'ordinary', locationId: 'home', sort: 'created-desc' }
+    };
+    const view = render(<ItemsGalleryPage {...props} />);
     const order = () => [...view.container.querySelectorAll('.item-gallery-card')].map(card => card.getAttribute('aria-label'));
-    const user = userEvent.setup();
-    expect(screen.getByLabelText('物品排序')).toHaveDisplayValue('最近更新');
+    expect(screen.queryByLabelText('物品排序')).not.toBeInTheDocument();
+    expect(screen.queryByText('最近新增')).not.toBeInTheDocument();
+    expect(screen.queryByText('最近更新')).not.toBeInTheDocument();
     expect(order()).toEqual(['旧物品', '新物品']);
-    await user.selectOptions(screen.getByLabelText('物品排序'), 'created-desc');
-    expect(order()).toEqual(['新物品', '旧物品']);
-    expect(onFilterChange).toHaveBeenLastCalledWith({ sort: 'created-desc' });
     expect(screen.getByLabelText('一级分类筛选')).toHaveValue('ordinary');
     expect(screen.getByLabelText('一级位置筛选')).toHaveValue('home');
     expect(screen.queryByRole('button', { name: '隐藏物品' })).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('物品排序'), 'updated-desc');
-    expect(order()).toEqual(['旧物品', '新物品']);
+    expect(onFilterChange).not.toHaveBeenCalled();
+
+    view.rerender(<ItemsGalleryPage {...props} items={visible.map(item => item.id === 'second' ? { ...item, updatedAt: '2026-05-01' } : item)} />);
+    expect(order()).toEqual(['新物品', '旧物品']);
   });
 });

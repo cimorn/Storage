@@ -47,7 +47,7 @@ export default function ItemsGalleryPage({
 
   const groups = useMemo(() => buildFilterGroups(categories, locations, filters, allItems), [allItems, categories, locations, filters]);
   const availableTags = useMemo(() => buildTagChips(allItems).map((chip) => chip.label), [allItems]);
-  const galleryItems = useMemo(() => sortItemGalleryItems(items, filters.sort).map((item) => buildItemCardView(item)), [items, filters.sort]);
+  const galleryItems = useMemo(() => sortItemGalleryItems(items).map((item) => buildItemCardView(item)), [items]);
   const categoryOptions = useMemo(() => buildLeafEntries(categories), [categories]);
   const locationOptions = useMemo(() => buildLeafEntries(locations), [locations]);
   const editingItem = useMemo(
@@ -167,10 +167,6 @@ export default function ItemsGalleryPage({
         />
 
         <div className="items-gallery-page__toolbar-side items-gallery-page__toolbar-side--actions">
-          <select className="item-sort-select" aria-label="物品排序" value={filters.sort || 'updated-desc'} onChange={(event) => onFilterChange?.({ sort: event.target.value })}>
-            <option value="created-desc">最近新增</option>
-            <option value="updated-desc">最近更新</option>
-          </select>
           <select className="item-packaging-filter" aria-label="包装筛选" value={filters.packaging || ''} onChange={(event) => onFilterChange?.({ packaging: event.target.value })}>
             <option value="">包装</option>
             <option value="packaged">有包装</option>

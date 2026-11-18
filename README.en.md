@@ -35,7 +35,7 @@ Cards show the name with a small gray brand beside it, specifications grouped by
 
 Uploads become WebP images with a maximum long edge of 1920 pixels, without enlarging the source, and photo metadata is removed. Photos follow category moves, and backups include every photo of each item.
 
-Items are sorted by latest update by default.
+Items always appear in order of their last modification, newest first.
 
 New items reuse the most recently added item's category, locations, brand, style and variant settings in the current area. Enter a new name, barcode, tags and photos; the private checkbox is not carried over.
 
